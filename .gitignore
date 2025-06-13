@@ -1,0 +1,16 @@
+__pycache__/
+# __pycache__/*
+data_test/
+results/
+static/
+weights/
+data_storage/
+
+minio_data/
+postgres_data/
+qdrant_storage/
+redis_data/
+kafka-data/
+fastembed_cache
+
+# git rm --ignore-unmatch --cached */__pycache__/*
