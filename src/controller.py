@@ -24,8 +24,8 @@ async def getData(inputs: InputUrl = Body(...)):
 @app.post("/api/createVideo")
 @HTTPException() 
 async def createVideo(inputs: InputGen = Body(...)):
-    print(inputs.descriptions)
-    result = await VG.run(inputs.sess_id, inputs.title, ast.literal_eval(inputs.descriptions), ast.literal_eval(inputs.image_path))
+    print(inputs)
+    result = await VG.run(inputs.sess_id, inputs.title, ast.literal_eval(inputs.descriptions), ast.literal_eval(inputs.image_paths))
     if not result["success"]:
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=201, content=result)
@@ -33,7 +33,7 @@ async def createVideo(inputs: InputGen = Body(...)):
     
 if __name__=="__main__":
     host = "0.0.0.0"
-    port = 8386
+    port = 8387
     uvicorn.run("controller:app", host=host, port=port, log_level="info", reload=False)
     
     

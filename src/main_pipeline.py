@@ -73,6 +73,7 @@ class VideoGeneration(object):
     async def get_data(self, sess_id: str, url: str):
         # ----init folder for sess_id----
         sess_image_dir = os.path.join(self.dir_image, sess_id)
+        delete_folder_exist(sess_image_dir=sess_image_dir)
         check_folder_exist(sess_image_dir=sess_image_dir)
         #/////////////////////////////
         result = extract_data(url=url, path_image_save=sess_image_dir)
@@ -81,44 +82,56 @@ class VideoGeneration(object):
 
         title_updated = self.MA41.split_title(title=title_original)["result"]
 
-        result = self.MA.get_idea(text=content)
-        title = result["title"]
+        result = self.MA.get_idea(text=content, title=title_original)
+        # title = result["title"]
         ideas = result.copy()
-        del ideas["title"]
+        # del ideas["title"]
 
         vdes = {}
         vipath = {}
+        thread_des = []
+        thread_vid = []
         for img in os.listdir(sess_image_dir):
-            vid = f"video_{len(vdes)}"
+            # vid = f"video_{len(vdes)}"
+            vid = f"video_{len(thread_des)}"
             image_path = os.path.join(sess_image_dir, img)
-            des = await self.IAW.get_description(title, image_path)
-            vdes[vid] = des["description_vi"]
+            # des = await self.IAW.get_description(title_original, image_path)
+            # vdes[vid] = des["description_vi"]
+            thread_des.append(self.IAW.get_description(title_original, image_path))
+            thread_vid.append(vid)
             vipath[vid] = image_path
+        result = await asyncio.gather(*thread_des)
+        result = [d["description_vi"] for d in result]
+        vdes.update(dict(zip(thread_vid, result)))
 
         img_list_des = self.MA.select_idea(description=vdes, ideas=ideas)
 
-        img_des = self.MA.synthesize_idea(ideas=img_list_des)
+        img_des = self.MA.synthesize_idea(ideas=img_list_des, title=title_original)
 
-        return {"success": True, "img_des": img_des, "img_path": vipath}
+        return {"success": True, "title": title_updated, "img_des": img_des, "img_path": vipath}
 
     @MyException()
     async def run(self, sess_id: str, title_updated: str, img_des: dict, vipath: dict):
         # ----init folder for sess_id----
-        sess_image_dir = os.path.join(self.dir_image, sess_id)
         sess_final_dir = os.path.join(self.dir_final_video, sess_id)
         sees_audio_dir = os.path.join(self.dir_audio, sess_id)
-        check_folder_exist(sess_image_dir=sess_image_dir, sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir)
-        list_path_delete = [sess_image_dir, sees_audio_dir, sess_final_dir]
+        delete_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir)
+        check_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir)
+        list_path_delete = [sees_audio_dir, sess_final_dir]
         #/////////////////////////////
 
         # title = "Chuyện một doanh nhân đưa trà Việt sang Paris"
         # title_updated = self.MA41.split_title(title=title)["result"]
 
-        # img_abbreviation = self.MA41.rewrite_abbreviation(news=img_des)
+        img_abbreviation = self.MA41.rewrite_abbreviation(news=img_des)
 
         # img_des = {'video_1': '**Trà Việt Nam** đã bắt đầu được **xuất khẩu sang phương Tây** từ thế kỷ 17. Ông **Thân Dỹ Ngữ**, Giám đốc Công ty TNHH Hiệp Thành, đã thành công trong việc **quảng bá trà Việt Nam** ra thế giới.', 'video_0': 'Hai loại **trà ô long ướp hoa sen** và **trà xanh ướp hoa sen** của Việt Nam được thương hiệu **Mariage Frères** xếp vào dòng sản phẩm **cao cấp nhất**. Giá bán lên tới **hơn 1.000 euro/ký**. Ngành trà Việt Nam đang **tăng trưởng** nhờ lối sống thay đổi và nhận thức cao về **lợi ích sức khỏe** của việc uống trà.', 'video_2': 'Việt Nam hiện có khoảng **120.000 héc ta** diện tích trồng trà. Mục tiêu mở rộng lên **135.000-140.000 héc ta** vào năm 2030.'}
-        img_abbreviation = {'video_1': {'TNHH': 'Trách Nhiệm Hữu Hạn', 'thế kỷ 17': 'thế kỷ mười bảy'}, 'video_0': {'1.000 euro/ký': 'một nghìn euro trên một ký'}, 'video_2': {'120.000 héc ta': 'một trăm hai mươi nghìn héc ta', '135.000-140.000 héc ta': 'một trăm ba mươi lăm nghìn đến một trăm bốn mươi nghìn héc ta', '2030': 'hai nghìn không trăm ba mươi'}}
+        # img_abbreviation = {'video_1': {'TNHH': 'Trách Nhiệm Hữu Hạn', 'thế kỷ 17': 'thế kỷ mười bảy'}, 'video_0': {'1.000 euro/ký': 'một nghìn euro trên một ký'}, 'video_2': {'120.000 héc ta': 'một trăm hai mươi nghìn héc ta', '135.000-140.000 héc ta': 'một trăm ba mươi lăm nghìn đến một trăm bốn mươi nghìn héc ta', '2030': 'hai nghìn không trăm ba mươi'}}
         # vipath = {'video_1': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/uong-tra.jpg', "video_0": '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/tra-sen3.jpg', 'video_2': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/tra-sen2.jpg'}
+
+        # img_des = {'video_1': 'Ông **Thân Dỹ Ngữ**, Giám đốc Công ty TNHH Hiệp Thành, là người tiên phong trong việc đưa **trà Việt Nam** vào thị trường **châu Âu**. Ông đã thành công trong việc khôi phục **niềm tin** của khách hàng quốc tế.', 'video_0': '**Trà Việt Nam** đang dần khẳng định vị thế trên thị trường quốc tế. Các sản phẩm cao cấp như **trà oolong ướp hoa sen** và **trà xanh ướp hoa sen** được bán tại **Mariage Frères**.', 'video_3':'Việt Nam hiện có khoảng **120.000 héc ta** diện tích trồng trà. Mục tiêu mở rộng lên **135.000-140.000 héc ta** vào năm **2030**, với tỷ lệ trà an toàn đạt **75%**.', 'video_2': 'Ngành trà Việt Nam đã có **lịch sử xuất khẩu** từ thế kỷ 17. Sự tham gia của các công ty nước ngoài như **Công ty Đông Ấn Hà Lan** và **Anh** đã góp phần vào sự phát triển này.'}
+        # img_abbreviation = {'video_1': {'TNHH': 'Trách Nhiệm Hữu Hạn', 'châu Âu': 'châu Âu', 'niềm tin': 'niềm tin'}, 'video_0': {'Trà Việt Nam': 'Trà Việt Nam', 'Mariage Frères': 'Mariage Frères'}, 'video_3': {'120.000 héc ta': 'một trăm hai mươi nghìn héc ta', '135.000-140.000 héc ta': 'một trăm ba mươi lăm nghìn đến một trăm bốn mươi nghìn héc ta', '2030': 'hai nghìn không trăm ba mươi', '75%': 'bảy mươi lăm phần trăm'}, 'video_2': {'lịch sử xuất khẩu': 'lịch sử xuất khẩu', 'Công ty Đông Ấn Hà Lan': 'Công ty Đông Ấn Hà Lan', 'Anh': 'Anh'}}
+        # vipath = {'video_1': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/uong-tra-2-copy.jpg', "video_0": '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/screenshot-54-22892885959342895322244.png', 'video_3':'/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/tra-sen3-copy.jpg', 'video_2': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/tra-sen2-copy.jpg'}
 
         audios = {}
         list_des = []
@@ -131,25 +144,27 @@ class VideoGeneration(object):
         for v_id, des in img_des.items():
             duration = 0
             sub_des_rewrite = des
-            for k, v in img_abbreviation[v_id].items():
-                sub_des_rewrite = sub_des_rewrite.replace(k ,v)
+            if v_id in img_abbreviation:
+                for k, v in img_abbreviation[v_id].items():
+                    sub_des_rewrite = sub_des_rewrite.replace(k ,v)
             sub_des_rewrite = sub_des_rewrite.replace(". ", ".\n").split("\n")
 
             sub_des = des.replace(". ", ".\n").split("\n")
             for i, sd in enumerate(sub_des_rewrite):
                 output_dir = self.ttsw(text=regex.sub(r'[\*\*.]', '', sd), output_dir=sees_audio_dir)
                 audios[f"{v_id}_{i}"] = output_dir
-                duration_audio += (len(sd.split())//5 + self.time_delay)*1000 + 400
+                duration_audio += (len(sd.split())//5 + self.time_delay)*1000 + 600
                 list_duration_audio.append(duration_audio)
 
                 list_des.append(sub_des[i])
                 duration_text += (len(sd.split())*0.2 + self.time_delay)
                 list_duration_text.append(round(duration_text, 2))
 
-                duration += (len(sd.split())//4 + self.time_delay)     
+                duration += (len(sd.split())//4.5 + self.time_delay)     
 
             list_overlay_image.append(vipath[v_id])
             list_duration.append(duration)
+        list_duration[-1] = list_duration[-1] + 2
 
         overlay_path = f"{sess_final_dir}{os.sep}overlay_video.mp4"
         result = await self.VEW.overlay_image(self.bg_image_path, list_overlay_image, list_duration, overlay_path, True)
@@ -172,7 +187,7 @@ if __name__=="__main__":
     sess_id = "test"
     query = "Trong số hơn 800 loại trà đến từ 36 quốc gia và vùng lãnh thổ có mặt tại Pháp cũng có tên trà của Việt Nam. Bất ngờ hơn nữa, trong đó có hai loại là trà ô long ướp hoa sen và trà xanh ướp hoa sen được thương hiệu Mariage Frères nổi tiếng xếp vào dòng sản phẩm cao cấp nhất, với giá bán hơn 1.000 euro/ký. Ở Kẻ Chợ - tên gọi dân gian chung của kinh thành Thăng Long vào thế kỷ 17 - có một khu vực dành cho các công ty và doanh nhân nước ngoài. Sớm nhất là thương điếm của Công ty Đông Ấn Hà Lan được mở vào năm 1637, tiếp đến là thương điếm của Công ty Đông Ấn Anh được lập vào năm 1863, sau đó đến các nước khác. Trà Việt Nam có lẽ đã bắt đầu được xuất khẩu sang phương Tây thông qua các công ty của Hà Lan và Anh này. Mức tăng trưởng của ngành trà ngày càng cao do lối sống thay đổi và người tiêu dùng nhận thức cao về việc uống trà có lợi cho sức khỏe. Vào danh mục trà cao cấp với giá bán hơn 1.000 euro mỗi ký Theo báo cáo của Guillaume Capus, chuyến hàng trà Đông Dương đầu tiên xuất khẩu sang Pháp là vào năm 1893. Năm 1899, trà Đông Dương được bán tại Paris (Pháp) và một số nước châu Âu, tổng khối lượng xuất khẩu là 131.391 ký, sau đó tăng lên mức 180.000 ký vào năm 1900. Trong số hơn 800 loại trà đến từ 36 quốc gia và vùng lãnh thổ hiện có mặt tại Pháp cũng có tên trà của Việt Nam. Bất ngờ hơn nữa, trong đó có hai loại là trà oolong ướp hoa sen và trà xanh ướp hoa sen được thương hiệu Mariage Frères nổi tiếng xếp vào dòng sản phẩm cao cấp nhất, với giá bán hơn 1.000 euro/ký. Người đưa được trà Việt Nam lên kệ của Mariage Frères là ông Thân Dỹ Ngữ, Giám đốc Công ty TNHH Hiệp Thành - doanh nghiệp sản xuất nông sản hữu cơ, chuyên xuất khẩu trà và nông sản hữu cơ sang thị trường Liên minh châu Âu và Mỹ. Ông cũng là thành viên Hiệp hội Nông nghiệp hữu cơ Việt Nam; là một trong những người sáng lập Liên minh Trà đặc sản hữu cơ Việt Nam (VOSTEA)."
 
-
+    sess_id = "aaaa"
     img_des = {'video_1': '**Trà Việt Nam** đã bắt đầu được **xuất khẩu sang phương Tây** từ thế kỷ 17. Ông **Thân Dỹ Ngữ**, Giám đốc Công ty TNHH Hiệp Thành, đã thành công trong việc **quảng bá trà Việt Nam** ra thế giới.', 'video_0': 'Hai loại **trà ô long ướp hoa sen** và **trà xanh ướp hoa sen** của Việt Nam được thương hiệu **Mariage Frères** xếp vào dòng sản phẩm **cao cấp nhất**. Giá bán lên tới **hơn 1.000 euro/ký**. Ngành trà Việt Nam đang **tăng trưởng** nhờ lối sống thay đổi và nhận thức cao về **lợi ích sức khỏe** của việc uống trà.', 'video_2': 'Việt Nam hiện có khoảng **120.000 héc ta** diện tích trồng trà. Mục tiêu mở rộng lên **135.000-140.000 héc ta** vào năm 2030.'}
     vipath = {'video_1': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/uong-tra.jpg', 'video_0': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/tra-sen3.jpg', 'video_2': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/tra-sen2.jpg'}
     title = "Chuyện một doanh nhân đưa trà Việt sang Paris"

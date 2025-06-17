@@ -19,6 +19,9 @@ if str(ROOT) not in sys.path:
 def split_tittle(title: str, size_title: list, font_type: str):
     w_title, h_title = size_title
 
+    if "%" in title:
+        title = title.replace("%", " phần trăm")
+        
     sub_title_original = title.split(", ")
     sub_title = regex.sub(r'[\*\*.]', '', title).split(", ")
     h_sub_title = h_title/len(sub_title)
@@ -37,9 +40,9 @@ def split_tittle(title: str, size_title: list, font_type: str):
         font = ImageFont.truetype(font_type, size=font_sz)
         length_stitle = font.getlength(stl)
         height_stitle = sum(font.getmetrics())
-        print(stl)
-        print(height_stitle)
-        print(length_stitle)
+        # print(stl)
+        # print(height_stitle)
+        # print(length_stitle)
 
         if length_stitle > w_title or height_stitle > h_sub_title:
             for fz in reversed(range(18,30)):
@@ -49,9 +52,9 @@ def split_tittle(title: str, size_title: list, font_type: str):
                 if length_stitle < w_title and height_stitle < h_sub_title:
 
                     break
-            print(font.size)
-            print(height_stitle)
-            print(length_stitle)
+            # print(font.size)
+            # print(height_stitle)
+            # print(length_stitle)
 
         elif length_stitle < w_title and height_stitle < h_sub_title:
             for fz in range(31,40):
@@ -63,10 +66,10 @@ def split_tittle(title: str, size_title: list, font_type: str):
                     height_stitle = sum(font.getmetrics())
                     length_stitle = font.getlength(stl)
                     break
-            print(font.size)
-            print(height_stitle)
-            print(length_stitle)
-        print("---------")
+        #     print(font.size)
+        #     print(height_stitle)
+        #     print(length_stitle)
+        # print("---------")
 
         for i in range(idx, max_idex_no_changed):
             idx_fz[i] = [font.size, height_stitle]
@@ -196,9 +199,9 @@ class VideoEditorWorker(object):
         text_infos = ""
         #--------------------split title----------------------
         size_title = [img_size[0]-padding_left-padding_right, 160-40]
-        print(size_title)
+        # print(size_title)
         sub_title_fz = split_tittle(title, size_title, self.font_title)
-        print(sub_title_fz)
+        # print(sub_title_fz)
         
         for stl, fz in reversed(sub_title_fz.items()):
             text_infos += f"drawtext=text={stl}:fontcolor=white:fontsize={fz[0]}:fontfile={self.font_title}:x={padding_left} + ({size_title[0]}-text_w)/2:y={y_title} - {fz[1]},"
@@ -220,6 +223,7 @@ class VideoEditorWorker(object):
         #         w_split_stl += font_ttl.getlength(s) - padding_w_title + w_space
         #     y_title -= fz[1]
         #/////////////////////////////////////////////////////
+
         # text_infos = f"drawtext=text={text}:fontcolor=yellow:fontsize=h/30:box=1:boxcolor=black@0.2:boxborderw=1:x=(w-text_w)/2:y='h-(t*50)':alpha='if(lt(t\,0.5)\, 0\, if(lt(t\,2)\, (t\-0.5)/1.5\, 1))'"
         # text_infos = f"drawtext=text={text}:fontcolor=yellow:fontsize=h/30:x=(w-text_w)/2:y='h-200*(1-exp(-2.3*t))':alpha='if(lt(t\,0.5)\, 0\, if(lt(t\,2)\, (t\-0.5)/1.5\, 1))'"
         
@@ -246,12 +250,22 @@ class VideoEditorWorker(object):
             # time_end = 0.2*len(list_word) + 2 + last_time_end + start_time[j]
             time_end = start_time[j+1]
             x_word = padding_left
-            y_word = (img_size[1] - 615 - h_word)
             x_word_end = img_size[0] - padding_right
+
+            w_sentence = self.font.getlength(st)
+            w_text_area = x_word_end - x_word
+            num_row_available = (720 - 615)/h_word
+            num_row_current = w_sentence/w_text_area + 1
+            num_row_spare = max(num_row_available - num_row_current, 0)
+
+            y_word = (img_size[1] - 615 - (1 + num_row_spare/2)*h_word)
             # print(list_word)
             for i, word in enumerate(list_word):
+                if "%" in word:
+                    word = word.replace("%", " phần trăm")
                 if "," in word:
                     word = word.replace(",", "\n")
+
                 num_above, num_below = count_accent(word)
                 num_accent = (num_above - num_below)
 

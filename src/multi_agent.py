@@ -4,10 +4,12 @@ from langchain_openai import ChatOpenAI
 from base.agent import Agent
 
 PROMPT_IDEA = """
+Here is the title: {title}
+
 Here is the newspaper: {text}
 
-Give me the title and some brief idea in the newspaper below:
-Format output as JSON with pair of value including: "title": <name of title>, "idea_<index>": <content of idea>
+Give me some brief idea in the newspaper below:
+Format output as JSON with pair of value including: "idea_<index>": <content of idea>
 
 ## RULES
 - The response must be in Vietnamese
@@ -18,7 +20,7 @@ ID videos and their description: {description}
 
 Here is ideas: {ideas}
 
-Based on the descriptions of videos below, select appropriate ideas that match with the content of video
+Based on the descriptions of videos below, select one or more appropriate ideas that match with the content of video
 Format output as JSON like: 
 {{
     <id video>: {{
@@ -32,6 +34,8 @@ Format output as JSON like:
 """
 
 PROMPT_SYNTHESIS = """
+Here is the title video: {title}
+
 ID videos and their ideas: {ideas} 
 
 ## TASKS
@@ -48,6 +52,7 @@ Format output as JSON like:
 - Bold the important information
 - Remember to sort video
 - Using dot to separate the news into multi ideas
+- Each video must have description
 - Each sentence is under 30 words
 """
 
@@ -107,28 +112,29 @@ class MultiAgent(object):
             llm = llm
         )
 
-    def get_idea(self, text: str):
+    def get_idea(self, text: str, title: str):
         def OutputStructured(BaseModel):
-            """Format the response as JSON with keys are 'title' and 'idea_<index>'"""
+            """Format the response as JSON with keys are 'idea_<index>'"""
 
-        result = self.idea_agent(OutputStructured, text=text)
-        print(result)
+        result = self.idea_agent(OutputStructured, text=text, title=title)
+        print(f"----get_idea: {result}")
         return result
 
     def select_idea(self, description: dict, ideas: dict):
         def OutputStructured(BaseModel):
             """Format the response as JSON with keys are id videos, and values are pairs of idea index with content of idea"""
 
+        print(description)
         result = self.classify_agent(OutputStructured, description=description, ideas=ideas)
-        print(result)
+        print(f"----select_idea: {result}")
         return result
 
-    def synthesize_idea(self, ideas):
+    def synthesize_idea(self, ideas, title):
         def OutputStructured(BaseModel):
             """Format the response as JSON with keys are id videos, and values are short news"""
 
-        result = self.synthesis_agent(OutputStructured, ideas=ideas)
-        print(result)
+        result = self.synthesis_agent(OutputStructured, ideas=ideas, title=title)
+        print(f"----synthesize_idea: {result}")
         return result
 
     def rewrite_abbreviation(self, news):
@@ -136,7 +142,7 @@ class MultiAgent(object):
             """Format the response as JSON with keys are id videos, and values are pairs of abbreviation and new words"""
 
         result = self.rewrite_abbreviation_agent(OutputStructured, news=news)
-        print(result)
+        print(f"----rewrite_abbreviation: {result}")
         return result
 
     def split_title(self, title):
@@ -144,7 +150,7 @@ class MultiAgent(object):
             """Format the response as JSON with key is 'result'"""
 
         result = self.split_title_agent(OutputStructured, title=title)
-        print(result)
+        print(f"----split_title: {result}")
         return result
 
 if __name__=="__main__":
