@@ -9,7 +9,7 @@ class Agent():
         self.prompt = prompt
         self.llm = llm
         
-    def __call__(self, OutputStructured, **kwargs):
+    async def __call__(self, OutputStructured, **kwargs):
         input_variables = {
             v for _, v, _, _ in Formatter().parse(self.prompt) if v is not None
         }
@@ -26,7 +26,7 @@ class Agent():
         )
 
         chain = chat_prompt | structured_output 
-        response = chain.invoke({})
+        response = await chain.ainvoke({})
         return response
     
     

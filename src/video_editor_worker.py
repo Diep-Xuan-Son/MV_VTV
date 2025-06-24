@@ -1,6 +1,5 @@
 import os
 import cv2
-import ffmpeg
 import asyncio
 import subprocess
 import unicodedata
@@ -110,7 +109,7 @@ def count_accent(word):
     # normalized = unicodedata.normalize('NFD', word)
     num_above = 0
     num_below = 0
-    char_tail = ["g", "p", "y", "q"]
+    char_tail = ["g", "p", "y", "q", ","]
     for char in word:
         decomposed = unicodedata.normalize('NFD', char)
         base = decomposed[0]
@@ -119,8 +118,10 @@ def count_accent(word):
         # num_above_char = 0
         if base in char_tail:
             num_below_char = 1
+        # print(decomposed)
         for mark in accents:
             name = unicodedata.name(mark)
+            # print(name)
             if 'BELOW' in name:
                 num_below_char = 1
             # else:
@@ -184,28 +185,30 @@ class VideoEditorWorker(object):
         print(f"----cmd: {cmd}")
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         stdout, stderr = await proc.communicate()
+        # subprocess.run(cmd, check=True)
         return {"success": True, "bg_size": size_bg[:2][::-1]}
 
     # async def add_static_text(self, texts: list, img_size: list):
 
 
-    async def add_text(self, title: str, texts: list, img_size: list, video_input_path: str, video_output_path: str, fast: bool, start_time: list=[0]):
+    async def add_text(self, title: str, texts: list, img_size: list, video_input_path: str, video_output_path: str, fast: bool, start_time: list=[0], text_position: list=[65, 65, 40, 160, 615, 720]):
         print(f"----running add_text----")
+        padding_left, padding_right, y_title_top, y_title_bottom, y_sub_top, y_sub_bottom = text_position
         # print(texts)
         # print(start_time)
-        padding_left = 65
-        padding_right = 65
-        y_title = 160
+        # padding_left = 65
+        # padding_right = 65
+        # y_title_bottom = 160
         text_infos = ""
         #--------------------split title----------------------
-        size_title = [img_size[0]-padding_left-padding_right, 160-40]
+        size_title = [img_size[0]-padding_left-padding_right, y_title_bottom-y_title_top]
         # print(size_title)
         sub_title_fz = split_tittle(title, size_title, self.font_title)
         # print(sub_title_fz)
         
         for stl, fz in reversed(sub_title_fz.items()):
-            text_infos += f"drawtext=text={stl}:fontcolor=white:fontsize={fz[0]}:fontfile={self.font_title}:x={padding_left} + ({size_title[0]}-text_w)/2:y={y_title} - {fz[1]},"
-            y_title -= fz[1]
+            text_infos += f"drawtext=text={stl}:fontcolor=white:fontsize={fz[0]}:fontfile={self.font_title}:x={padding_left} + ({size_title[0]}-text_w)/2:y={y_title_bottom} - {fz[1]},"
+            y_title_bottom -= fz[1]
 
         # list_subtile, list_bold = get_bold_text(sub_title_fz)
         # for i, (stl, fz) in enumerate(reversed(sub_title_fz.items())):
@@ -219,9 +222,9 @@ class VideoEditorWorker(object):
         #             fontcolor = "yellow"
         #         else:
         #             fontcolor = "white"
-        #         text_infos += f"drawtext=text={s}:fontcolor={fontcolor}:fontsize={fz[0]}:fontfile={self.font_title}:x={padding_left} + {w_split_stl} + {padding_w_title}:y={y_title} - {fz[1]},"
+        #         text_infos += f"drawtext=text={s}:fontcolor={fontcolor}:fontsize={fz[0]}:fontfile={self.font_title}:x={padding_left} + {w_split_stl} + {padding_w_title}:y={y_title_bottom} - {fz[1]},"
         #         w_split_stl += font_ttl.getlength(s) - padding_w_title + w_space
-        #     y_title -= fz[1]
+        #     y_title_bottom -= fz[1]
         #/////////////////////////////////////////////////////
 
         # text_infos = f"drawtext=text={text}:fontcolor=yellow:fontsize=h/30:box=1:boxcolor=black@0.2:boxborderw=1:x=(w-text_w)/2:y='h-(t*50)':alpha='if(lt(t\,0.5)\, 0\, if(lt(t\,2)\, (t\-0.5)/1.5\, 1))'"
@@ -246,7 +249,7 @@ class VideoEditorWorker(object):
             word_index = list(accumulate([len(w)+1 for w in st.split()]))
 
             # list_word = regex.sub(r'[^\w\s]', '', st).split()
-            list_word = regex.sub(r'[\*\*.]', '', st).split()
+            list_word = regex.sub(r'[\*\*]', '', st.rstrip(". ")).split()
             # time_end = 0.2*len(list_word) + 2 + last_time_end + start_time[j]
             time_end = start_time[j+1]
             x_word = padding_left
@@ -254,26 +257,28 @@ class VideoEditorWorker(object):
 
             w_sentence = self.font.getlength(st)
             w_text_area = x_word_end - x_word
-            num_row_available = (720 - 615)/h_word
+            num_row_available = (y_sub_bottom - y_sub_top)/h_word
             num_row_current = w_sentence/w_text_area + 1
             num_row_spare = max(num_row_available - num_row_current, 0)
 
-            y_word = (img_size[1] - 615 - (1 + num_row_spare/2)*h_word)
+            y_word = (img_size[1] - y_sub_top - (1 + num_row_spare/2)*h_word)
             # print(list_word)
             for i, word in enumerate(list_word):
                 if "%" in word:
                     word = word.replace("%", " phần trăm")
-                if "," in word:
+                if word.endswith(","):
                     word = word.replace(",", "\n")
 
+                # print(word)
                 num_above, num_below = count_accent(word)
+                # print(num_below)
                 num_accent = (num_above - num_below)
 
                 if word_index[i] in bold_index:
                     fontfile = self.font_bold
                     fontcolor = 'yellow'
                     w_s = w_space * (0.8 + len(word)/6)
-                    accent_ratio = num_accent/4
+                    accent_ratio = num_accent/5
 
                     w_bold_word = 0
                     for bi in range(i,min(i+3, len(word_index))):
@@ -289,7 +294,7 @@ class VideoEditorWorker(object):
                     fontfile = self.font_text
                     fontcolor = 'white'
                     w_s = w_space
-                    accent_ratio = num_accent/5
+                    accent_ratio = num_accent/5.5
                 
                 w_word = self.font.getlength(word)
                 if x_word + w_word > x_word_end:
@@ -317,6 +322,7 @@ class VideoEditorWorker(object):
         # print(f"----cmd: {cmd}")
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         stdout, stderr = await proc.communicate()
+        # subprocess.run(cmd, check=True)
         return {"success": True}
 
     async def add_audio(self, video_input_path: str, list_audio_path: list, list_audio_time: list, audio_background_path: str, video_output_path: str):   #audio time in miliseconds

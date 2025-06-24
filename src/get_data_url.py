@@ -20,9 +20,7 @@ def save_img(img, path_save):
         img_src = base_url + img.get('src')
     # print(img_src)
     filename = os.path.basename(urlparse(img_src).path)
-    path = "images"
-    if not os.path.exists(path):
-        os.mkdir(path) 
+
     try:
         urllib.request.urlretrieve(img_src, f"{path_save}{os.sep}{filename}")
     except Exception as e:

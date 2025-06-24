@@ -1,5 +1,6 @@
 import os
 import jwt
+import asyncio
 from langchain_openai import ChatOpenAI
 from base.agent import Agent
 
@@ -12,15 +13,17 @@ Give me some brief idea in the newspaper below:
 Format output as JSON with pair of value including: "idea_<index>": <content of idea>
 
 ## RULES
+- Don't repeat title in idea
+- Removing the dot after abbreviations in place names
 - The response must be in Vietnamese
 """
 
 PROMPT_CLASSIFY_IDEA = """
-ID videos and their description: {description}
+ID videos and descriptions: {description}
 
 Here is ideas: {ideas}
 
-Based on the descriptions of videos below, select one or more appropriate ideas that match with the content of video
+Based on the descriptions of videos, select one or more appropriate ideas that match with the content of video
 Format output as JSON like: 
 {{
     <id video>: {{
@@ -31,15 +34,16 @@ Format output as JSON like:
 
 ## RULES
 - Each idea just appear in one id video
+- Focus on the objects in description to select appropriately
 """
 
 PROMPT_SYNTHESIS = """
 Here is the title video: {title}
 
-ID videos and their ideas: {ideas} 
+ID videos and ideas: {ideas} 
 
 ## TASKS
-- Based on these ideas of videos below write for me short news for each video
+- Based on these ideas of videos, write for me short news for each video
 - Sort video for creating an excited news
 
 Format output as JSON like: 
@@ -53,8 +57,10 @@ Format output as JSON like:
 - Remember to sort video
 - Using dot to separate the news into multi ideas
 - Each video must have description
+- Change the comma in numeric to dot, don't change date time
 - Each sentence is under 30 words
 """
+# - Using "\n" to separate the news into multi sentences
 
 PROMPT_REWRITE_ABBREVIATION = """
 Here is the id video and their news: {news}
@@ -112,44 +118,44 @@ class MultiAgent(object):
             llm = llm
         )
 
-    def get_idea(self, text: str, title: str):
+    async def get_idea(self, text: str, title: str):
         def OutputStructured(BaseModel):
             """Format the response as JSON with keys are 'idea_<index>'"""
 
-        result = self.idea_agent(OutputStructured, text=text, title=title)
+        result = await self.idea_agent(OutputStructured, text=text, title=title)
         print(f"----get_idea: {result}")
         return result
 
-    def select_idea(self, description: dict, ideas: dict):
+    async def select_idea(self, description: dict, ideas: dict):
         def OutputStructured(BaseModel):
             """Format the response as JSON with keys are id videos, and values are pairs of idea index with content of idea"""
 
         print(description)
-        result = self.classify_agent(OutputStructured, description=description, ideas=ideas)
+        result = await self.classify_agent(OutputStructured, description=description, ideas=ideas)
         print(f"----select_idea: {result}")
         return result
 
-    def synthesize_idea(self, ideas, title):
+    async def synthesize_idea(self, ideas, title):
         def OutputStructured(BaseModel):
             """Format the response as JSON with keys are id videos, and values are short news"""
 
-        result = self.synthesis_agent(OutputStructured, ideas=ideas, title=title)
+        result = await self.synthesis_agent(OutputStructured, ideas=ideas, title=title)
         print(f"----synthesize_idea: {result}")
         return result
 
-    def rewrite_abbreviation(self, news):
+    async def rewrite_abbreviation(self, news):
         def OutputStructured(BaseModel):
             """Format the response as JSON with keys are id videos, and values are pairs of abbreviation and new words"""
 
-        result = self.rewrite_abbreviation_agent(OutputStructured, news=news)
+        result = await self.rewrite_abbreviation_agent(OutputStructured, news=news)
         print(f"----rewrite_abbreviation: {result}")
         return result
 
-    def split_title(self, title):
+    async def split_title(self, title):
         def OutputStructured(BaseModel):
             """Format the response as JSON with key is 'result'"""
 
-        result = self.split_title_agent(OutputStructured, title=title)
+        result = await self.split_title_agent(OutputStructured, title=title)
         print(f"----split_title: {result}")
         return result
 
@@ -183,9 +189,10 @@ if __name__=="__main__":
 
     # MA.select_idea(description=description, ideas=ideas)
 
-    img_list_des = {'video_0': {'idea_1': 'Hai loại trà ô long ướp hoa sen và trà xanh ướp hoa sen của Việt Nam đã được thương hiệu Mariage Frères xếp vào dòng sản phẩm cao cấp nhất, với giá bán hơn 1.000 euro/ký.', 'idea_3': 'Ngành trà Việt Nam đang tăng trưởng nhờ lối sống thay đổi và nhận thức cao về lợi ích sức khỏe của việc uống trà.'}, 'video_1': {'idea_2': 'Trà Việt Nam bắt đầu được xuất khẩu sang phương Tây từ thế kỷ 17 thông qua các công ty Đông Ấn Hà Lan và Anh.', 'idea_4': 'Ông Thân Dỹ Ngữ, Giám đốc Công ty TNHH Hiệp Thành, là người đưa trà Việt Nam vào kệ của Mariage Frères và đã thành công trong việc quảng bá trà Việt Nam ra thế giới.'}, 'video_2': {'idea_5': 'Việt Nam hiện có khoảng 120.000 héc ta diện tích trồng trà và mục tiêu mở rộng lên 135.000-140.000 héc ta vào năm 2030.'}}
-
-    # MA.synthesize_idea(ideas=img_list_des)
+    # img_list_des = {'video_0': {'idea_1': 'Hai loại trà ô long ướp hoa sen và trà xanh ướp hoa sen của Việt Nam đã được thương hiệu Mariage Frères xếp vào dòng sản phẩm cao cấp nhất, với giá bán hơn 1.000 euro/ký.', 'idea_3': 'Ngành trà Việt Nam đang tăng trưởng nhờ lối sống thay đổi và nhận thức cao về lợi ích sức khỏe của việc uống trà.'}, 'video_1': {'idea_2': 'Trà Việt Nam bắt đầu được xuất khẩu sang phương Tây từ thế kỷ 17 thông qua các công ty Đông Ấn Hà Lan và Anh.', 'idea_4': 'Ông Thân Dỹ Ngữ, Giám đốc Công ty TNHH Hiệp Thành, là người đưa trà Việt Nam vào kệ của Mariage Frères và đã thành công trong việc quảng bá trà Việt Nam ra thế giới.'}, 'video_2': {'idea_5': 'Việt Nam hiện có khoảng 120.000 héc ta diện tích trồng trà và mục tiêu mở rộng lên 135.000-140.000 héc ta vào năm 2030.'}}
+    img_list_des = {'video_0': {'idea_1': 'Tín dụng tại TP. Hồ Chí Minh đã đạt 4,102 triệu tỉ đồng, tăng 3,89% so với cuối năm 2024, cho thấy sự phục hồi mạnh mẽ của nền kinh tế.', 'idea_2': 'Tốc độ tăng trưởng tín dụng trong 5 tháng đầu năm 2025 cao gấp đôi so với cùng kỳ năm 2023 và 2024, nhờ vào môi trường kinh doanh thuận lợi và chính sách tiền tệ linh hoạt.', 'idea_3': 'Dư nợ tín dụng trong lĩnh vực bán buôn, bán lẻ và sửa chữa ô tô, xe máy đã tăng 15,1% so với cùng kỳ năm trước, cho thấy sự phục hồi trong tiêu dùng.', 'idea_4': 'Ngành công nghiệp chế biến, chế tạo cũng ghi nhận mức tăng trưởng tín dụng đáng kể, cho thấy hoạt động sản xuất đang phục hồi và doanh nghiệp mở rộng đầu tư.', 'idea_5': 'Các yếu tố hỗ trợ tăng trưởng tín dụng bao gồm hoạt động du lịch sôi động và việc giải ngân vốn đầu tư công được thúc đẩy.'}}
+    asyncio.run(MA.synthesize_idea(ideas=img_list_des, title="Tín dụng tại TP. Hồ Chí Minh, vượt mốc 4.1 triệu tỉ đồng, phản ánh đà phục hồi mạnh mẽ, của nền kinh tế"))
+    exit()
 
     llm1 = ChatOpenAI(
         model="gpt-4.1-mini",

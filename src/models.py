@@ -16,3 +16,6 @@ class InputGen(BaseModel):
     descriptions: str = ""
     image_paths: str = ""
     
+class Status(BaseModel):
+    sess_id: str = ""
+    type: str = ""

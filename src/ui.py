@@ -1,7 +1,10 @@
 import os
+import time
 import uuid
 import json
+import asyncio
 import requests
+import threading
 from PIL import Image
 import streamlit as st
 from io import BytesIO
@@ -22,9 +25,91 @@ if 'title_video' not in st.session_state:
 if 'video_path' not in st.session_state:
     st.session_state["video_path"] = ""
 
+def update_status_data(sess_id, type):
+    url = "http://localhost:8387/api/getStatus"
+    
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    
+    payload = json.dumps({
+        "sess_id": sess_id,
+        "type": type
+    })
+    
+    res = requests.request("POST", url, headers=headers, data=payload)
+    content = res.json()
+    
+    if res.status_code == 200:
+        percent = float(content["percent"])
+        status = content["status"]
+        text_response = ""
+        title = ""
+        images_data = []
+        if percent==100 and status=="done":
+            print(content)
+            text_response = "Analyzing Successfully!"
+            result = json.loads(content['result'])
+            descriptions = result["img_des"]
+            image_paths = result["img_path"]
+            title = result["title"]
+
+            for i, (v_id, des) in enumerate(descriptions.items()):
+                images_data.append({
+                    'v_id': v_id,
+                    'description': des,
+                    'image_path': image_paths[v_id]
+                })
+
+        elif status=="error":
+            text_response = f"Can't analyze because {json.loads(content['result'])['error']}"
+    else:
+        percent = 0
+        status = "error"
+        title = ""
+        images_data = []
+        text_response = content
+    
+    return percent, status, text_response, title, images_data
+
+def update_status_video(sess_id, type):
+    url = "http://localhost:8387/api/getStatus"
+    
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    
+    payload = json.dumps({
+        "sess_id": sess_id,
+        "type": type
+    })
+    
+    res = requests.request("POST", url, headers=headers, data=payload)
+    content = res.json()
+    
+    if res.status_code == 200:
+        percent = float(content["percent"])
+        status = content["status"]
+        text_response = ""
+        video_path = ""
+        if percent==100 and status=="done":
+            print(content)
+            text_response = "Creating Successfully!"
+            result = json.loads(content['result'])
+            video_path = result["result_path"]
+
+        elif status=="error":
+            text_response = f"Can't create video because {json.loads(content['result'])['error']}"
+    else:
+        percent = 0
+        status = "error"
+        text_response = content
+        video_path = ""
+    
+    return percent, status, text_response, video_path
 
 def get_data(sess_id: str, url_input: str):
-    url = "http://192.168.6.190:8387/api/getData"
+    url = "http://localhost:8387/api/getData"
 
     headers = {
         'Content-Type': 'application/json'
@@ -37,32 +122,32 @@ def get_data(sess_id: str, url_input: str):
 
     res = requests.request("POST", url, headers=headers, data=payload)
 
-    if res.status_code == 201:
-        content = res.json()
-        descriptions = content["img_des"]
-        image_paths = content["img_path"]
-        title = content["title"]
-    else:
-        descriptions = []
-        image_paths = []
-        title = ""
+    # if res.status_code == 201:
+    #     content = res.json()
+    #     descriptions = content["img_des"]
+    #     image_paths = content["img_path"]
+    #     title = content["title"]
+    # else:
+    #     descriptions = []
+    #     image_paths = []
+    #     title = ""
 
-    images_data = []
-    for i, (v_id, des) in enumerate(descriptions.items()):
-        # img_pil = Image.open(image_paths[v_id])
+    # images_data = []
+    # for i, (v_id, des) in enumerate(descriptions.items()):
+    #     # img_pil = Image.open(image_paths[v_id])
 
-        # # Skip very small images (likely icons)
-        # if img_pil.size[0] < 100 or img_pil.size[1] < 100:
-        #     continue
+    #     # # Skip very small images (likely icons)
+    #     # if img_pil.size[0] < 100 or img_pil.size[1] < 100:
+    #     #     continue
 
-        images_data.append({
-            'v_id': v_id,
-            'description': des,
-            'image_path': image_paths[v_id]
-        })
+    #     images_data.append({
+    #         'v_id': v_id,
+    #         'description': des,
+    #         'image_path': image_paths[v_id]
+    #     })
 
-    print(images_data)
-    return title, images_data
+    # print(images_data)
+    # return title, images_data
 
 def create_video(sess_id, title, images_data):
     v_ids = []
@@ -73,7 +158,7 @@ def create_video(sess_id, title, images_data):
         descriptions.append(dt['description'])
         image_paths.append(dt['image_path'])
 
-    url = "http://192.168.6.190:8387/api/createVideo"
+    url = "http://localhost:8387/api/createVideo"
 
     headers = {
         'Content-Type': 'application/json'
@@ -88,13 +173,13 @@ def create_video(sess_id, title, images_data):
 
     res = requests.request("POST", url, headers=headers, data=payload)
 
-    if res.status_code == 201:
-        content = res.json()
-        video_path = content["result_path"]
-    else:
-        video_path = ""
+    # if res.status_code == 201:
+    #     content = res.json()
+    #     video_path = content["result_path"]
+    # else:
+    #     video_path = ""
 
-    return video_path
+    # return video_path
     
 st.set_page_config(page_title="Video Generation", page_icon="🎬", layout="wide")
 
@@ -120,9 +205,26 @@ if send_button and url_input.strip():
         url_input = 'https://' + url_input
 
     # Process as URL
+    progress_bar = st.progress(0)
+    status_text = st.empty()
     with st.spinner("Analyzing URL ..."):
-        st.session_state["title_video"], st.session_state["images_data"] = get_data(st.session_state["sess_id"], url_input)
+        # st.session_state["title_video"], st.session_state["images_data"] = get_data(st.session_state["sess_id"], url_input)
+        thread = threading.Thread(target=get_data, args=(st.session_state["sess_id"], url_input,), daemon=True)
+        thread.start()
         st.session_state["processed_url"] = url_input
+        while True:
+            time.sleep(1)
+            percent, status, text_response, st.session_state["title_video"], st.session_state["images_data"] = update_status_data(st.session_state["sess_id"], "data")
+            progress_bar.progress(percent/100)
+            status_text.text(f"Processing... {percent}%")
+            if status == "done":
+                st.success(f"✅ {text_response}")
+                # st.balloons()
+                break
+            elif status == "error":
+                st.error(f"❌ {text_response}")
+        progress_bar.empty()
+        status_text.empty()
 
 print(st.session_state["images_data"])
 # Display extracted images
@@ -179,8 +281,26 @@ if st.session_state["images_data"]:
     # Video creation section
     st.header("3. Create Video")
     if st.button("Create Video", type="primary"):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         with st.spinner("Creating video ..."):
-            st.session_state["video_path"] = create_video(st.session_state["sess_id"], st.session_state["title_video"], st.session_state["images_data"])
+            # st.session_state["video_path"] = create_video(st.session_state["sess_id"], st.session_state["title_video"], st.session_state["images_data"])
+            thread = threading.Thread(target=create_video, args=(st.session_state["sess_id"], st.session_state["title_video"], st.session_state["images_data"],), daemon=True)
+            thread.start()
+            st.session_state["processed_url"] = url_input
+            while True:
+                time.sleep(1)
+                percent, status, text_response, st.session_state["video_path"] = update_status_video(st.session_state["sess_id"], "video")
+                progress_bar.progress(percent/100)
+                status_text.text(f"Processing... {percent}%")
+                if status == "done":
+                    st.success(f"✅ {text_response}")
+                    # st.balloons()
+                    break
+                elif status == "error":
+                    st.error(f"❌ {text_response}")
+            progress_bar.empty()
+            status_text.empty()
 
     if os.path.exists(st.session_state["video_path"]):
         col1, col2, col3 = st.columns([1, 1, 2])

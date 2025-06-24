@@ -30,11 +30,7 @@ Format the response as JSON like below:
 """
 
 class ImageAnalyzationWorker(object):
-    def __init__(self,):
-        SECRET_KEY  = os.getenv('SECRET_KEY', "MMV")
-        token_gem   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5IjoiQUl6YVN5Q1BKSHNJYUxXaGdMakllQkZVS3E4VHFrclRFdWhGd2xzIn0.7iN_1kRmOahYrT7i5FUplOYeda1s7QhYzk-D-AlgWgE'
-        api_key_gem = jwt.decode(token_gem, SECRET_KEY, algorithms=["HS256"])["api_key"]
-
+    def __init__(self, api_key_gem: str):
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-2.0-flash-001",
             temperature=0,
@@ -69,7 +65,11 @@ class ImageAnalyzationWorker(object):
         return result
 
 if __name__=="__main__":
-    IAW = ImageAnalyzationWorker()
+    SECRET_KEY  = os.getenv('SECRET_KEY', "MMV")
+    TOKEN_GEM   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5IjoiQUl6YVN5Q1BKSHNJYUxXaGdMakllQkZVS3E4VHFrclRFdWhGd2xzIn0.7iN_1kRmOahYrT7i5FUplOYeda1s7QhYzk-D-AlgWgE'
+    API_KEY_GEM = jwt.decode(TOKEN_GEM, SECRET_KEY, algorithms=["HS256"])["api_key"]
+    
+    IAW = ImageAnalyzationWorker(API_KEY_GEM)
     query = "Chuyện một doanh nhân đưa trà Việt sang Paris"
     image_path = "./data_test/uong-tra.jpg"
 

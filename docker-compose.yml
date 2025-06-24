@@ -1,0 +1,79 @@
+version: '3'
+networks:
+  mynetwork:
+    driver: bridge
+services:
+  # minio:
+  #   image: quay.io/minio/minio
+  #   container_name: mmv_minio
+  #   restart: always
+  #   environment:
+  #     - MINIO_ROOT_USER=demo
+  #     - MINIO_ROOT_PASSWORD=demo123456
+  #   ports: 
+  #     - "9000:9000"
+  #     - "9001:9001"
+  #   volumes:
+  #     - ./minio_data:/data
+  #   networks:
+  #     mynetwork:
+  #   profiles:
+  #     - minio
+  #   command: server /data --address ":9000" --console-address ":9001"
+
+  redis:
+    image: redis/redis-stack:latest
+    container_name: mvvtv_redis
+    restart: always
+    environment:
+      - REDIS_ARGS=--requirepass root
+    ports: 
+      - "8389:8389"
+    volumes:
+      - ./redis_data:/data
+      - ./redis_config/redis1.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      mynetwork:
+    profiles:
+      - redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+
+  mv_service:
+    image: dixuson/mv_vtv
+    container_name: mvvtv
+    restart: always
+    environment:
+      - SECRET_KEY=MMV
+      - API_OPENAI_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5Ijoic2stcHJvai1QSDNHNnlMVEticmdvaU9ieTA4YlVMNHc0eVYxR3NJa25IeEltTl9VMFI1WmVsOWpKcDI0MzZuNUEwOTdVdTVDeXVFMDJha1RqNVQzQmxia0ZKX3dJTUw2RHVrZzh4eWtsUXdsMTN0b2JfcGVkV1c0T1hsNzhQWGVIcDhOLW1DNjY1ZE1CdUlLMFVlWEt1bzRRUnk2Ylk1dDNYSUEifQ.2qjUENU0rafI6syRlTfnKIsm6O4zuhHRqahUcculn8E
+      - API_GEM_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5IjoiQUl6YVN5Q1BKSHNJYUxXaGdMakllQkZVS3E4VHFrclRFdWhGd2xzIn0.7iN_1kRmOahYrT7i5FUplOYeda1s7QhYzk-D-AlgWgE
+    build:
+      dockerfile: Dockerfile_controller
+    ports: 
+      - "8388:8388"
+      - "8387:8387"
+    depends_on:
+      - redis
+    volumes:
+      - ./static:/app/static
+      - ./src:/workspace/
+      - ./logs:/app/logs
+    networks:
+      mynetwork:
+    profiles:
+      - mv_vtv
+    # command: python3.11 controller.py
+    command: sh -c "nohup streamlit run ui.py --server.address 0.0.0.0 --server.port 8388 > ./logs/streamlit.log 2>&1 & uvicorn --workers 1 --host 0.0.0.0 --port 8387 controller:app"
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['0']
+            capabilities: [gpu]
+
+
+
+# docker compose -f docker-compose.yml --profile dev1 up -d
+# docker compose -f docker-compose.yml --profile "*" up -d
+# docker compose -f docker-compose.yml --profile triton_server up -d

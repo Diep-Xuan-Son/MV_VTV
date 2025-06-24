@@ -1,0 +1,30 @@
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+
+RUN apt-get update 
+RUN apt-get install -y \
+        ffmpeg \
+        nano \
+        curl \
+        espeak-ng
+
+RUN pip install --upgrade pip
+
+WORKDIR /app
+COPY requirements.txt /app/requirements.txt
+COPY requirements_serving.txt /app/requirements_serving.txt
+COPY requirements_ui.txt /app/requirements_ui.txt
+
+RUN python3.11 -m pip uninstall -y numpy
+RUN python3.11 -m pip --no-cache-dir install -r /app/requirements.txt
+RUN python3.11 -m pip --no-cache-dir install -r /app/requirements_serving.txt
+RUN python3.11 -m pip --no-cache-dir install -r /app/requirements_ui.txt
+
+RUN mkdir -p /app/weights
+
+COPY ./weights /app/weights
+COPY ./src /app
+
+# CMD ["python3.11", "controller.py"]
+
+# docker build -t dixuson/mv_vtv --load --rm -f Dockerfile_controller .
+# docker run -d -p 8388:8388 -p 8387:8387 --name mvvtv dixuson/mv_vtv

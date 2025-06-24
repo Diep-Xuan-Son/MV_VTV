@@ -8,6 +8,7 @@ if str(ROOT) not in sys.path:
 
 import os
 import torch
+import asyncio
 import soundfile as sf
 from StyleTTS2.inference import StyleTTS2
 
@@ -25,25 +26,40 @@ class TTS(object):
         for i, path in enumerate(reference_path, 1):
             self.speakers[f"id_{i}"] = {
                                 "path": path,   #Ref audio path
-                                "lang": "vi",                           #Default language
-                                "speed": 1.0,                           #Speaking speed
+                                "lang": "vi",   #Default language
+                                "speed": 1.0,   #Speaking speed
                             }
         # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.device = 'cuda' if torch.cuda.is_available() and device!="cpu" else 'cpu'
         self.model = StyleTTS2(config_path, self.model_path, nltk_data_path).eval().to(self.device)
 
-    def __call__(self, text: str, output_dir: str, default_speaker: str="[id_1]", avg_style: bool=True, stabilize: bool=True, denoise: float=0.6, n_merge: int=20):
-        with torch.no_grad():
-            styles = self.model.get_styles(self.speakers, denoise, avg_style)
-            r = self.model.generate(text, styles, stabilize, n_merge, default_speaker)
-            # output_dir = os.path.join(self.output_dir, u_id)
-            # if not os.path.exists(output_dir):
-            #     os.makedirs(output_dir)
-            n_file = len(os.listdir(output_dir))
-            output_dir = f"{output_dir}{os.sep}{n_file}.wav"
-            with open(output_dir, "wb") as f:
-                sf.write(f.name, r, 24000)
-            return output_dir
+    async def __call__(self, text: str, output_dir: str, reference_path: list=[], default_speaker: str="[id_1]", avg_style: bool=True, stabilize: bool=True, denoise: float=0.6, n_merge: int=20):
+        def _synthesize(text, output_dir, default_speaker, reference_path, avg_style, stabilize, denoise, n_merge):
+            if reference_path:
+                speakers = {}
+                for i, path in enumerate(reference_path, 1):
+                    speakers[f"id_{i}"] = {
+                        "path": path,   #Ref audio path
+                        "lang": "vi",   #Default language
+                        "speed": 1.0,   #Speaking speed
+                    }
+            else:
+                speakers = self.speakers.copy()
+
+            with torch.no_grad():
+                styles = self.model.get_styles(speakers, denoise, avg_style)
+                r = self.model.generate(text, styles, stabilize, n_merge, default_speaker)
+                # output_dir = os.path.join(self.output_dir, u_id)
+                # if not os.path.exists(output_dir):
+                #     os.makedirs(output_dir)
+                n_file = len(os.listdir(output_dir))
+                output_dir = f"{output_dir}{os.sep}{n_file}.wav"
+                with open(output_dir, "wb") as f:
+                    sf.write(f.name, r, 24000)
+                return output_dir
+
+        output_path = await asyncio.to_thread(_synthesize, text, output_dir, default_speaker, reference_path, avg_style, stabilize, denoise, n_merge)
+        return output_path
 
 if __name__=="__main__":
     tts = TTS()

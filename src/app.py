@@ -23,9 +23,16 @@ check_folder_exist(path_log=PATH_LOG, path_static=PATH_STATIC)
 # LOGGER_APP = set_log_file(file_name="app")
 
 SECRET_KEY     = os.getenv('SECRET_KEY', "MMV")
-TOKEN_OPENAI   = os.getenv('API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5Ijoic2stcHJvai1QSDNHNnlMVEticmdvaU9ieTA4YlVMNHc0eVYxR3NJa25IeEltTl9VMFI1WmVsOWpKcDI0MzZuNUEwOTdVdTVDeXVFMDJha1RqNVQzQmxia0ZKX3dJTUw2RHVrZzh4eWtsUXdsMTN0b2JfcGVkV1c0T1hsNzhQWGVIcDhOLW1DNjY1ZE1CdUlLMFVlWEt1bzRRUnk2Ylk1dDNYSUEifQ.2qjUENU0rafI6syRlTfnKIsm6O4zuhHRqahUcculn8E')
+TOKEN_OPENAI   = os.getenv('API_OPENAI_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5Ijoic2stcHJvai1QSDNHNnlMVEticmdvaU9ieTA4YlVMNHc0eVYxR3NJa25IeEltTl9VMFI1WmVsOWpKcDI0MzZuNUEwOTdVdTVDeXVFMDJha1RqNVQzQmxia0ZKX3dJTUw2RHVrZzh4eWtsUXdsMTN0b2JfcGVkV1c0T1hsNzhQWGVIcDhOLW1DNjY1ZE1CdUlLMFVlWEt1bzRRUnk2Ylk1dDNYSUEifQ.2qjUENU0rafI6syRlTfnKIsm6O4zuhHRqahUcculn8E')
 API_KEY_OPENAI = jwt.decode(TOKEN_OPENAI, SECRET_KEY, algorithms=["HS256"])["api_key"]
-VG = VideoGeneration(api_key_openai=API_KEY_OPENAI)
+
+SECRET_KEY  = os.getenv('SECRET_KEY', "MMV")
+TOKEN_GEM   = os.getenv('API_GEM_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5IjoiQUl6YVN5Q1BKSHNJYUxXaGdMakllQkZVS3E4VHFrclRFdWhGd2xzIn0.7iN_1kRmOahYrT7i5FUplOYeda1s7QhYzk-D-AlgWgE')
+API_KEY_GEM = jwt.decode(TOKEN_GEM, SECRET_KEY, algorithms=["HS256"])["api_key"]
+
+REDIS_URL = "redis://:root@redis:8389"
+
+VG = VideoGeneration(redis_url=REDIS_URL, api_key_openai=API_KEY_OPENAI, api_key_gem=API_KEY_GEM)
 
 # Create FastAPI application
 app = FastAPI(

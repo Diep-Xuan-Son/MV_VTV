@@ -2,7 +2,6 @@ import ast
 import json
 import uuid
 import uvicorn
-import aiofiles
 from itertools import chain
 from dataclasses import dataclass, field
 from string import ascii_letters, digits, punctuation
@@ -11,13 +10,15 @@ from app import *
 from langchain_core.prompts import ChatPromptTemplate
 # from prompts import PROMPT_CHECK_MAKING_VIDEO, PROMPT_GET_MEMORY
 from langchain_core.messages import HumanMessage, SystemMessage
-from models import InputUrl, InputGen
+from models import InputUrl, InputGen, Status
 
 @app.post("/api/getData")
 @HTTPException() 
 async def getData(inputs: InputUrl = Body(...)):
     result = await VG.get_data(sess_id=inputs.sess_id, url=inputs.url)
+    VG.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 100, "done")
     if not result["success"]:
+        VG.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 0, "error")
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=201, content=result)
 
@@ -26,10 +27,19 @@ async def getData(inputs: InputUrl = Body(...)):
 async def createVideo(inputs: InputGen = Body(...)):
     print(inputs)
     result = await VG.run(inputs.sess_id, inputs.title, ast.literal_eval(inputs.descriptions), ast.literal_eval(inputs.image_paths))
+    VG.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 100, "done")
     if not result["success"]:
+        VG.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 0, "error")
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=201, content=result)
-    
+
+@app.post("/api/getStatus")
+@HTTPException() 
+async def getStatus(inputs: Status = Body(...)):
+    result = VG.get_status(session_id=inputs.sess_id, type=inputs.type)
+    if not result["success"]:
+        return JSONResponse(status_code=500, content=result["error"])
+    return JSONResponse(status_code=200, content=result['result'])
     
 if __name__=="__main__":
     host = "0.0.0.0"

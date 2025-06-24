@@ -1,0 +1,22 @@
+numpy
+rq
+loguru
+#torchaudio
+opencv-python-headless
+
+langchain-core
+langchain-google-genai
+langchain_openai
+
+#----for database----
+minio
+redis
+
+# ----tts----
+munch
+noisereduce
+phonemizer
+espeakng-loader
+nltk
+soundfile
+librosa
