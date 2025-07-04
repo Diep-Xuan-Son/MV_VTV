@@ -71,7 +71,7 @@ class VideoGeneration(object):
         self.dir_audio = f"{DIR}{os.sep}static{os.sep}audio_transcribe"
         self.dir_final_video = f"{DIR}{os.sep}static{os.sep}final_video"
         check_folder_exist(dir_image=self.dir_image, dir_audio=self.dir_audio)
-        self.bg_image_path = f"{DIR}{os.sep}data{os.sep}image_backgrounds{os.sep}bg.png"
+        self.bg_image_path = f"{DIR}{os.sep}data{os.sep}image_backgrounds{os.sep}bg3.png"
 
         self.ttsw = TTS(model_path=tts_model_path, config_path=tts_config_path, nltk_data_path=nltk_data_path, output_dir=self.dir_audio)
 
@@ -92,7 +92,7 @@ class VideoGeneration(object):
             target=self.delete_sess, args=())
         self.delete_sess_thread.start()
 
-        self.time_delay = 2
+        self.time_delay = 1
 
     def delete_sess(self, ):
         while True:
@@ -172,10 +172,16 @@ class VideoGeneration(object):
 
         img_list_des = await self.MA.select_idea(description=vdes, ideas=ideas)
         self.update_status(sess_id, "data", str(datetime.now()), {}, 90, "running")
+        img_list_des_new = {}
+        for vid, list_des in img_list_des.items():
+            des = [f"{k}: {v}" for k, v in list_des.items()]
+            des = " ".join(des)
+            img_list_des_new[vid] = des
 
-        img_des = await self.MA.synthesize_idea(ideas=img_list_des, title=title_original)
+        img_des = await self.MA.synthesize_idea(ideas=img_list_des_new, title=title_original)
+        img_des_new = {k: v for k, v in img_des.items() if k in list(img_list_des)}
 
-        return {"success": True, "title": title_updated, "img_des": img_des, "img_path": vipath}
+        return {"success": True, "title": title_updated, "img_des": img_des_new, "img_path": vipath}
 
     @MyException()
     async def run(self, sess_id: str, title_updated: str, img_des: dict, vipath: dict):
@@ -216,20 +222,27 @@ class VideoGeneration(object):
             if v_id in img_abbreviation:
                 for k, v in img_abbreviation[v_id].items():
                     sub_des_rewrite = sub_des_rewrite.replace(k ,v)
-            sub_des_rewrite = sub_des_rewrite.replace(". ", "\n").split("\n")
+            sub_des_rewrite = sub_des_rewrite.replace(". ", "\n").replace("tháng tháng", "tháng").split("\n")
 
             sub_des = des.replace(". ", "\n").split("\n")
+            time_delay = self.time_delay
             for i, sd in enumerate(sub_des_rewrite):
+                if i+1==len(sub_des_rewrite):
+                    time_delay = self.time_delay*2
                 output_dir = await self.ttsw(text=regex.sub(r'[\*\*]', '', sd.rstrip(". ")), output_dir=sees_audio_dir, reference_path=[f"{DIR}/StyleTTS2/reference_audio/vn_1.wav"])
                 audios[f"{v_id}_{i}"] = output_dir
-                duration_audio += (len(sd.split())//5 + self.time_delay)*1000 + 600
+                # duration_audio += (len(sd.split())//5 + self.time_delay)*1000 + 600
+                audio_time = await self.VEW.get_duration(output_dir)
+                duration_audio += int(audio_time + time_delay)*1000
                 list_duration_audio.append(duration_audio)
 
                 list_des.append(sub_des[i])
-                duration_text += (len(sd.split())*0.2 + self.time_delay)
-                list_duration_text.append(round(duration_text, 2))
+                # duration_text += (len(sd.split())*0.2 + self.time_delay)
+                # list_duration_text.append(round(duration_text, 2))
+                list_duration_text.append(duration_audio/1000)
 
-                duration += (len(sd.split())//4.5 + self.time_delay)     
+                # duration += (len(sd.split())//4.5 + self.time_delay) 
+                duration += int(audio_time + time_delay)     
 
             list_overlay_image.append(vipath[v_id])
             list_duration.append(duration)
@@ -242,7 +255,7 @@ class VideoGeneration(object):
         self.update_status(sess_id, "video", str(datetime.now()), {}, 80, "running")
 
         overlay_text_path = f"{sess_final_dir}{os.sep}overlay_text_video.mp4"
-        result = await self.VEW.add_text(title_updated, list_des, bg_sz, overlay_path, overlay_text_path, False, [0] + list_duration_text)
+        result = await self.VEW.add_text(title_updated, list_des, bg_sz, overlay_path, overlay_text_path, False, [0] + list_duration_text, [160, 160, 160, 420, 1490, 1715])
         self.update_status(sess_id, "video", str(datetime.now()), {}, 90, "running")
 
         final_video_audio_file = f"{sess_final_dir}{os.sep}final_video.mp4"
@@ -265,11 +278,11 @@ if __name__=="__main__":
 
     sess_id = "aaaa"
     img_des = {'video_1': '**Trà Việt Nam** đã bắt đầu được **xuất khẩu sang phương Tây** từ thế kỷ 17. Ông **Thân Dỹ Ngữ**, Giám đốc Công ty TNHH Hiệp Thành, đã thành công trong việc **quảng bá trà Việt Nam** ra thế giới.', 'video_0': 'Hai loại **trà ô long ướp hoa sen** và **trà xanh ướp hoa sen** của Việt Nam được thương hiệu **Mariage Frères** xếp vào dòng sản phẩm **cao cấp nhất**. Giá bán lên tới **hơn 1.000 euro/ký**. Ngành trà Việt Nam đang **tăng trưởng** nhờ lối sống thay đổi và nhận thức cao về **lợi ích sức khỏe** của việc uống trà.', 'video_2': 'Việt Nam hiện có khoảng **120.000 héc ta** diện tích trồng trà. Mục tiêu mở rộng lên **135.000-140.000 héc ta** vào năm 2030.'}
-    vipath = {'video_1': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/uong-tra.jpg', 'video_0': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/tra-sen3.jpg', 'video_2': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/tra-sen2.jpg'}
+    vipath = {'video_1': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/aaaa/uong-tra-2.jpg', 'video_0': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/aaaa/tra-sen3.jpg', 'video_2': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/aaaa/tra-sen2.jpg'}
     title = "Chuyện một doanh nhân đưa trà Việt sang Paris"
 
-    sess_id = "test"
-    img_des = {'video_0': '**Tín dụng tại TP Hồ Chí Minh đã đạt 4,102 triệu tỉ đồng**, tăng 3.89% so với cuối năm 2024. Điều này cho thấy **sự phục hồi mạnh mẽ của nền kinh tế**. Tốc độ tăng trưởng tín dụng trong 5 tháng đầu năm 2025 **cao gấp đôi so với cùng kỳ năm 2023 và 2024**. Sự tăng trưởng này nhờ vào **môi trường kinh doanh thuận lợi và chính sách tiền tệ linh hoạt**. Các doanh nghiệp đang **mở rộng quy mô và tăng cường đầu tư trở lại**, thể hiện niềm tin tích cực vào triển vọng kinh tế.'}
-    vipath = {'video_0': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/1.jpg'}
-    title = "Tín dụng tại TP Hồ Chí Minh, vượt mốc 4.1 triệu tỉ đồng, phản ánh đà phục hồi mạnh mẽ, của nền kinh tế"
+    # sess_id = "test"
+    # img_des = {'video_0': '**Tín dụng tại TP Hồ Chí Minh đã đạt 4,102 triệu tỉ đồng**, tăng 3.89% so với cuối năm 2024. Điều này cho thấy **sự phục hồi mạnh mẽ của nền kinh tế**. Tốc độ tăng trưởng tín dụng trong 5 tháng đầu năm 2025 **cao gấp đôi so với cùng kỳ năm 2023 và 2024**. Sự tăng trưởng này nhờ vào **môi trường kinh doanh thuận lợi và chính sách tiền tệ linh hoạt**. Các doanh nghiệp đang **mở rộng quy mô và tăng cường đầu tư trở lại**, thể hiện niềm tin tích cực vào triển vọng kinh tế.'}
+    # vipath = {'video_0': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/test/1.jpg'}
+    # title = "Tín dụng tại TP Hồ Chí Minh, vượt mốc 4.1 triệu tỉ đồng, phản ánh đà phục hồi mạnh mẽ, của nền kinh tế"
     asyncio.run(VG.run(sess_id, title, img_des, vipath))

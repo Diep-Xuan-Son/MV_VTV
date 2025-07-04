@@ -35,6 +35,7 @@ Format output as JSON like:
 ## RULES
 - Each idea just appear in one id video
 - Focus on the objects in description to select appropriately
+- All ideas need to be selected
 """
 
 PROMPT_SYNTHESIS = """
@@ -53,14 +54,16 @@ Format output as JSON like:
 
 ## RULES
 - The response must be in Vietnamese
-- Bold the important information
+- Bold the important information, just bold less than five words
 - Remember to sort video
-- Using dot to separate the news into multi ideas
 - Each video must have description
-- Change the comma in numeric to dot, don't change date time
-- Each sentence is under 30 words
+- Don't use commas for enumerating will be better
+- Just get existed video
+- Each sentence is under 20 words
 """
-# - Using "\n" to separate the news into multi sentences
+# - Change the comma in numeric to dot, don't change date time
+# - Interrupt a sentence using "\\t"
+# - Use "\\n" to set a sentence as a new line
 
 PROMPT_REWRITE_ABBREVIATION = """
 Here is the id video and their news: {news}
@@ -83,6 +86,7 @@ Interrupt the title reasonably with one or more comma
 Each splited tittle need to be under 6 words
 Don't use comma for single word
 Change the comma in numeric to dot, don't change date time
+Keep apostrophe or double quote symbol 
 Output is a new title
 """
 # Bold the important information
@@ -183,16 +187,21 @@ if __name__=="__main__":
     # exit()
 
     ideas = {'idea_1': 'Hai loại trà ô long ướp hoa sen và trà xanh ướp hoa sen của Việt Nam đã được thương hiệu Mariage Frères xếp vào dòng sản phẩm cao cấp nhất, với giá bán hơn 1.000 euro/ký.', 'idea_2': 'Trà Việt Nam bắt đầu được xuất khẩu sang phương Tây từ thế kỷ 17 thông qua các công ty Đông Ấn Hà Lan và Anh.', 'idea_3': 'Ngành trà Việt Nam đang tăng trưởng nhờ lối sống thay đổi và nhận thức cao về lợi ích sức khỏe của việc uống trà.', 'idea_4': 'Ông Thân Dỹ Ngữ, Giám đốc Công ty TNHH Hiệp Thành, là người đưa trà Việt Nam vào kệ của Mariage Frères và đã thành công trong việc quảng bá trà Việt Nam ra thế giới.', 'idea_5': 'Việt Nam hiện có khoảng 120.000 héc ta diện tích trồng trà và mục tiêu mở rộng lên 135.000-140.000 héc ta vào năm 2030.'}
-    title = 'Trà Việt Nam Được Xếp Hạng Cao Cấp Tại Pháp'
 
     description = {'video_0': 'Hình ảnh cận cảnh một tách trà Việt Nam màu hổ phách, được đựng trong chén sứ trắng vẽ hình ảnh đậm chất Á Đông. Bọt trà li ti nổi trên bề mặt, tạo cảm giác tươi mới và hấp dẫn. Sự kết hợp giữa màu sắc và họa tiết mang đến vẻ đẹp tinh tế, gợi nhớ đến văn hóa trà đạo truyền thống.', 'video_1': 'Bức ảnh thể hiện một khung cảnh thanh bình với hai người, một người đàn ông lớn tuổi và một người phụ nữ trẻ, đang thưởng trà theo phong cách truyền thống Việt Nam. Bộ trà cụ tinh xảo và trang phục truyền thống làm tăng thêm vẻ đẹp và sự trang trọng của buổi trà đạo. Sự tương phản giữa thế hệ và sự kết nối với văn hóa tạo nên một hình ảnh hấp dẫn.', 'video_2': 'Hình ảnh cận cảnh của trà Việt Nam, có thể là một loại trà đặc biệt như trà Shan Tuyết cổ thụ, với những búp trà xanh và những sợi trắng (có thể là tuyết trà hoặc một loại nấm cộng sinh). Hình ảnh này gợi lên sự quý hiếm và chất lượng cao của trà.'}
 
-    # MA.select_idea(description=description, ideas=ideas)
+    ideas = {'idea_1': 'Future Homes đã khai trương chi nhánh mới tại Đà Nẵng vào ngày 2/7/2025, nhằm mở rộng sự hiện diện tại miền Trung.', 'idea_2': 'Đà Nẵng được chọn làm địa điểm chi nhánh mới nhờ vào vai trò là trung tâm kinh tế, du lịch và công nghệ của khu vực miền Trung – Tây Nguyên.', 'idea_3': 'Chi nhánh Đà Nẵng nằm ở vị trí trung tâm, gần các đầu mối giao thông quan trọng, thuận tiện cho giao dịch và tổ chức sự kiện.', 'idea_4': 'Văn phòng mới sẽ phân phối các dự án bất động sản cao cấp từ nhiều chủ đầu tư lớn như Masterise Homes, BRG Group và Vinhomes.', 'idea_5': 'Future Homes đang phát triển đội ngũ môi giới chuyên nghiệp và sử dụng công nghệ hiện đại để tối ưu hóa trải nghiệm khách hàng.', 'idea_6': 'Doanh nghiệp đã triển khai nền tảng CRM tích hợp AI để hỗ trợ mô hình dịch vụ tư vấn theo định hướng đầu tư.', 'idea_7': 'Lễ khai trương có sự tham gia của ban lãnh đạo công ty, các đối tác và nhân sự từ Hà Nội và Đà Nẵng, khẳng định cam kết mở rộng hệ sinh thái bất động sản.'}
+    description = {'video_0': 'Hình ảnh ghi lại khoảnh khắc khai trương chi nhánh mới của Future Homes tại Đà Nẵng. Bức ảnh có sự tham gia của đông đảo nhân viên và đối tác, tạo nên không khí trang trọng và phấn khởi. Sự kiện này đánh dấu bước phát triển quan trọng của Future Homes trong việc mở rộng thị trường tại khu vực miền Trung.', 'video_1': "Hình ảnh ghi lại khoảnh khắc khai trương chi nhánh Future Homes tại Đà Nẵng. Bảng hiệu lớn màu đỏ nổi bật với dòng chữ 'GRAND OPENING' màu vàng kim, cùng với hình ảnh thành phố Đà Nẵng phía dưới, tạo nên sự trang trọng và thu hút."}
+
+    asyncio.run(MA.select_idea(description=description, ideas=ideas))
+    exit()
 
     # img_list_des = {'video_0': {'idea_1': 'Hai loại trà ô long ướp hoa sen và trà xanh ướp hoa sen của Việt Nam đã được thương hiệu Mariage Frères xếp vào dòng sản phẩm cao cấp nhất, với giá bán hơn 1.000 euro/ký.', 'idea_3': 'Ngành trà Việt Nam đang tăng trưởng nhờ lối sống thay đổi và nhận thức cao về lợi ích sức khỏe của việc uống trà.'}, 'video_1': {'idea_2': 'Trà Việt Nam bắt đầu được xuất khẩu sang phương Tây từ thế kỷ 17 thông qua các công ty Đông Ấn Hà Lan và Anh.', 'idea_4': 'Ông Thân Dỹ Ngữ, Giám đốc Công ty TNHH Hiệp Thành, là người đưa trà Việt Nam vào kệ của Mariage Frères và đã thành công trong việc quảng bá trà Việt Nam ra thế giới.'}, 'video_2': {'idea_5': 'Việt Nam hiện có khoảng 120.000 héc ta diện tích trồng trà và mục tiêu mở rộng lên 135.000-140.000 héc ta vào năm 2030.'}}
-    img_list_des = {'video_0': {'idea_1': 'Tín dụng tại TP. Hồ Chí Minh đã đạt 4,102 triệu tỉ đồng, tăng 3,89% so với cuối năm 2024, cho thấy sự phục hồi mạnh mẽ của nền kinh tế.', 'idea_2': 'Tốc độ tăng trưởng tín dụng trong 5 tháng đầu năm 2025 cao gấp đôi so với cùng kỳ năm 2023 và 2024, nhờ vào môi trường kinh doanh thuận lợi và chính sách tiền tệ linh hoạt.', 'idea_3': 'Dư nợ tín dụng trong lĩnh vực bán buôn, bán lẻ và sửa chữa ô tô, xe máy đã tăng 15,1% so với cùng kỳ năm trước, cho thấy sự phục hồi trong tiêu dùng.', 'idea_4': 'Ngành công nghiệp chế biến, chế tạo cũng ghi nhận mức tăng trưởng tín dụng đáng kể, cho thấy hoạt động sản xuất đang phục hồi và doanh nghiệp mở rộng đầu tư.', 'idea_5': 'Các yếu tố hỗ trợ tăng trưởng tín dụng bao gồm hoạt động du lịch sôi động và việc giải ngân vốn đầu tư công được thúc đẩy.'}}
-    asyncio.run(MA.synthesize_idea(ideas=img_list_des, title="Tín dụng tại TP. Hồ Chí Minh, vượt mốc 4.1 triệu tỉ đồng, phản ánh đà phục hồi mạnh mẽ, của nền kinh tế"))
-    exit()
+    # img_list_des = {'video_0': {'idea_1': 'Các quỹ phòng hộ đã đồng loạt bán tháo cổ phiếu năng lượng với tốc độ nhanh nhất kể từ tháng 9/2024 do giá dầu lao dốc.', 'idea_2': 'Giá dầu thô đã giảm hơn 10 USD trong một tuần sau thỏa thuận ngừng bắn giữa Israel và Iran, gây áp lực lên thị trường năng lượng.'}, 'video_1': {'idea_3': 'Xu hướng rút vốn khỏi cổ phiếu năng lượng mạnh mẽ hơn ở châu Âu, nơi các quỹ không chỉ cắt giảm vị thế mua mà còn gia tăng bán khống.', 'idea_4': 'Mặc dù có đợt bán tháo cổ phiếu năng lượng, các quỹ vẫn mua cổ phiếu mạnh nhất trong 5 tuần qua, chuyển hướng đầu tư sang các ngành tài chính, công nghệ và công nghiệp.'}}
+    img_list_des = {'video_0': {'idea_1': 'Giá vàng thế giới tăng mạnh, đạt 2.324 USD/ounce, tăng hơn 20 USD/ounce so với đầu phiên, phục hồi sau những phiên giảm trước đó.', 'idea_3': 'Giá vàng trong nước cũng tăng mạnh, với giá vàng miếng SJC tăng khoảng 1 triệu đồng/lượng so với buổi sáng, đạt 75,98 triệu đồng/lượng (mua vào) và 77,98 triệu đồng/lượng (bán ra).', 'idea_4': 'Tập đoàn DOJI cũng điều chỉnh giá vàng SJC lên 75,9 triệu đồng/lượng (mua vào) và 77,9 triệu đồng/lượng (bán ra).'}}
+    # img_list_des = {'video_0': {'idea_1': 'Tín dụng tại TP. Hồ Chí Minh đã đạt 4,102 triệu tỉ đồng, tăng 3,89% so với cuối năm 2024, cho thấy sự phục hồi mạnh mẽ của nền kinh tế.', 'idea_2': 'Tốc độ tăng trưởng tín dụng trong 5 tháng đầu năm 2025 cao gấp đôi so với cùng kỳ năm 2023 và 2024, nhờ vào môi trường kinh doanh thuận lợi và chính sách tiền tệ linh hoạt.', 'idea_3': 'Dư nợ tín dụng trong lĩnh vực bán buôn, bán lẻ và sửa chữa ô tô, xe máy đã tăng 15,1% so với cùng kỳ năm trước, cho thấy sự phục hồi trong tiêu dùng.', 'idea_4': 'Ngành công nghiệp chế biến, chế tạo cũng ghi nhận mức tăng trưởng tín dụng đáng kể, cho thấy hoạt động sản xuất đang phục hồi và doanh nghiệp mở rộng đầu tư.', 'idea_5': 'Các yếu tố hỗ trợ tăng trưởng tín dụng bao gồm hoạt động du lịch sôi động và việc giải ngân vốn đầu tư công được thúc đẩy.'}}
+    # asyncio.run(MA.synthesize_idea(ideas=img_list_des, title="Tín dụng tại TP. Hồ Chí Minh, vượt mốc 4.1 triệu tỉ đồng, phản ánh đà phục hồi mạnh mẽ, của nền kinh tế"))
+    # exit()
 
     llm1 = ChatOpenAI(
         model="gpt-4.1-mini",
@@ -212,6 +221,7 @@ if __name__=="__main__":
 
     # MA1.rewrite_abbreviation(news=img_des)
 
-    title = f"Thị trường sáng 12/6: VN-Index vượt mốc 1.320 điểm nhờ dòng tiền lan tỏa mạnh mẽ"
+    # title = f"Thị trường sáng 12/6: 'VN-Index' vượt mốc 1.320 điểm nhờ dòng tiền lan tỏa mạnh mẽ"
+    title = "Future Homes khai trương chi nhánh tại Đà Nẵng, mở rộng hiện diện tại thị trường miền Trung"
 
-    MA1.split_title(title=title)
+    asyncio.run(MA1.split_title(title=title))

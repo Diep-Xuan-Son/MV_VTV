@@ -40,7 +40,7 @@ services:
 
 
   mv_service:
-    image: dixuson/mv_vtv
+    image: dixuson/mv_vtv:cu128
     container_name: mvvtv
     restart: always
     environment:

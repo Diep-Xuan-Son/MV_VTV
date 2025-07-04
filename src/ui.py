@@ -242,6 +242,7 @@ if st.session_state["images_data"]:
     
     if st.button(f"Update title", key=f"update_title_button"):
         st.session_state["title_video"] = title
+        st.success(f"✅ Update title success!")
         st.rerun()
 
     for i, img_data in enumerate(st.session_state["images_data"]):
@@ -276,6 +277,7 @@ if st.session_state["images_data"]:
                 if st.button(f"Update description", key=f"update_des_button_{i}"):
                     # Update the description in session state
                     st.session_state["images_data"][i]['description'] = new_description
+                    st.success(f"✅ Update description success!")
                     st.rerun()
 
     # Video creation section

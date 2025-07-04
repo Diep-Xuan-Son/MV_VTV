@@ -2,6 +2,7 @@ import ast
 import json
 import uuid
 import uvicorn
+import re as regex
 from itertools import chain
 from dataclasses import dataclass, field
 from string import ascii_letters, digits, punctuation
@@ -15,7 +16,9 @@ from models import InputUrl, InputGen, Status
 @app.post("/api/getData")
 @HTTPException() 
 async def getData(inputs: InputUrl = Body(...)):
-    result = await VG.get_data(sess_id=inputs.sess_id, url=inputs.url)
+    urls = regex.findall(r'https?://[^\s]+', inputs.url)
+    url = urls[-1] if urls else None
+    result = await VG.get_data(sess_id=inputs.sess_id, url=url)
     VG.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 100, "done")
     if not result["success"]:
         VG.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 0, "error")
