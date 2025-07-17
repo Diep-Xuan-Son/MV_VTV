@@ -18,10 +18,10 @@ from models import InputUrl, InputGen, Status
 async def getData(inputs: InputUrl = Body(...)):
     urls = regex.findall(r'https?://[^\s]+', inputs.url)
     url = urls[-1] if urls else None
-    result = await VG.get_data(sess_id=inputs.sess_id, url=url)
-    VG.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 100, "done")
+    result = await MULTIW.VG.get_data(sess_id=inputs.sess_id, url=url)
+    VG.dataw.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 100, "done")
     if not result["success"]:
-        VG.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 0, "error")
+        VG.dataw.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 0, "error")
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=201, content=result)
 
@@ -29,25 +29,87 @@ async def getData(inputs: InputUrl = Body(...)):
 @HTTPException() 
 async def createVideo(inputs: InputGen = Body(...)):
     print(inputs)
-    result = await VG.run(inputs.sess_id, inputs.title, ast.literal_eval(inputs.descriptions), ast.literal_eval(inputs.image_paths))
-    VG.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 100, "done")
+    result = await MULTIW.VG.run(inputs.sess_id, inputs.title, ast.literal_eval(inputs.descriptions), ast.literal_eval(inputs.image_paths))
+    VG.dataw.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 100, "done")
     if not result["success"]:
-        VG.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 0, "error")
+        VG.dataw.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 0, "error")
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=201, content=result)
+
+@app.post("/api/getDataCache")
+@HTTPException() 
+async def getData(inputs: InputUrl = Body(...)):
+    if MULTIW.VG.dataw.redisClient.hexists(str(inputs.sess_id), "data"):
+        return JSONResponse(status_code=409, content=str(f"The session_id is duplicated!"))
+
+    urls = regex.findall(r'https?://[^\s]+', inputs.url)
+    url = urls[-1] if urls else None
+    inputs.url = url
+    producer = app.state.producer
+    await producer.send_and_wait(
+        Config.TOPIC_DATA,
+        value=inputs.__dict__,
+        key=inputs.sess_id.encode() if inputs.sess_id else None
+    )
+
+    if not MULTIW.VG.dataw.redisClient.hexists(str(inputs.sess_id), "data"):
+        if MULTIW.VG.dataw.redisClient.hexists("session", "existed"):
+            list_sess = eval(MULTIW.VG.dataw.redisClient.hget("session", "existed"))
+        else:
+            list_sess = []
+        if inputs.sess_id not in list_sess:
+            list_sess.append(inputs.sess_id)
+        MULTIW.VG.dataw.redisClient.hset("session", "existed", str(list_sess))
+
+    MULTIW.VG.dataw.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), {}, 0, "pending")
+    return JSONResponse(status_code=201, content=str(f"Message delivered to {Config.TOPIC_DATA}"))
+
+@app.post("/api/createVideoCache")
+@HTTPException() 
+async def createVideoCache(inputs: InputGen = Body(...)):
+    print(inputs)
+    producer = app.state.producer
+    await producer.send_and_wait(
+        Config.TOPIC_QUERY,
+        value=inputs.__dict__,
+        key=inputs.sess_id.encode() if inputs.sess_id else None
+    )
+
+    if not MULTIW.VG.dataw.redisClient.hexists(str(inputs.sess_id), "data"):
+        if MULTIW.VG.dataw.redisClient.hexists("session", "existed"):
+            list_sess = eval(MULTIW.VG.dataw.redisClient.hget("session", "existed"))
+        else:
+            list_sess = []
+        if inputs.sess_id not in list_sess:
+            list_sess.append(inputs.sess_id)
+        MULTIW.VG.dataw.redisClient.hset("session", "existed", str(list_sess))
+
+    MULTIW.VG.dataw.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), {}, 0, "pending")
+    return JSONResponse(status_code=201, content=str(f"Message delivered to {Config.TOPIC_QUERY}"))
 
 @app.post("/api/getStatus")
 @HTTPException() 
 async def getStatus(inputs: Status = Body(...)):
-    result = VG.get_status(session_id=inputs.sess_id, type=inputs.type)
+    result = MULTIW.VG.dataw.get_status(session_id=inputs.sess_id, type=inputs.type)
     if not result["success"]:
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=200, content=result['result'])
+
+@app.post("/api/deleteSession")
+@HTTPException() 
+async def deleteSession(inputs: Status = Body(...)):
+    if not MULTIW.VG.dataw.redisClient.hexists(str(inputs.sess_id), inputs.type):
+        return JSONResponse(status_code=501, content=str(f"The session_id doesn't exist!"))
+
+    MULTIW.VG.dataw.redisClient.hdel(str(inputs.sess_id), inputs.type)
+    return JSONResponse(status_code=200, content="Delete complete!")
     
+
+
 if __name__=="__main__":
     host = "0.0.0.0"
-    port = 8387
-    uvicorn.run("controller:app", host=host, port=port, log_level="info", reload=False)
+    port = 8507
+    uvicorn.run("controller:app", host=host, port=port, log_level="info", reload=False, workers=1)
     
     
     

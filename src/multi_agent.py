@@ -82,7 +82,7 @@ Format output as JSON like:
 
 PROMPT_SPLIT_TITLE = """
 Here is the title: {title}
-Interrupt the title reasonably with one or more comma
+Interrupt the title reasonably with one to three comma
 Each splited tittle need to be under 6 words
 Don't use comma for single word
 Change the comma in numeric to dot, don't change date time
@@ -193,8 +193,8 @@ if __name__=="__main__":
     ideas = {'idea_1': 'Future Homes đã khai trương chi nhánh mới tại Đà Nẵng vào ngày 2/7/2025, nhằm mở rộng sự hiện diện tại miền Trung.', 'idea_2': 'Đà Nẵng được chọn làm địa điểm chi nhánh mới nhờ vào vai trò là trung tâm kinh tế, du lịch và công nghệ của khu vực miền Trung – Tây Nguyên.', 'idea_3': 'Chi nhánh Đà Nẵng nằm ở vị trí trung tâm, gần các đầu mối giao thông quan trọng, thuận tiện cho giao dịch và tổ chức sự kiện.', 'idea_4': 'Văn phòng mới sẽ phân phối các dự án bất động sản cao cấp từ nhiều chủ đầu tư lớn như Masterise Homes, BRG Group và Vinhomes.', 'idea_5': 'Future Homes đang phát triển đội ngũ môi giới chuyên nghiệp và sử dụng công nghệ hiện đại để tối ưu hóa trải nghiệm khách hàng.', 'idea_6': 'Doanh nghiệp đã triển khai nền tảng CRM tích hợp AI để hỗ trợ mô hình dịch vụ tư vấn theo định hướng đầu tư.', 'idea_7': 'Lễ khai trương có sự tham gia của ban lãnh đạo công ty, các đối tác và nhân sự từ Hà Nội và Đà Nẵng, khẳng định cam kết mở rộng hệ sinh thái bất động sản.'}
     description = {'video_0': 'Hình ảnh ghi lại khoảnh khắc khai trương chi nhánh mới của Future Homes tại Đà Nẵng. Bức ảnh có sự tham gia của đông đảo nhân viên và đối tác, tạo nên không khí trang trọng và phấn khởi. Sự kiện này đánh dấu bước phát triển quan trọng của Future Homes trong việc mở rộng thị trường tại khu vực miền Trung.', 'video_1': "Hình ảnh ghi lại khoảnh khắc khai trương chi nhánh Future Homes tại Đà Nẵng. Bảng hiệu lớn màu đỏ nổi bật với dòng chữ 'GRAND OPENING' màu vàng kim, cùng với hình ảnh thành phố Đà Nẵng phía dưới, tạo nên sự trang trọng và thu hút."}
 
-    asyncio.run(MA.select_idea(description=description, ideas=ideas))
-    exit()
+    # asyncio.run(MA.select_idea(description=description, ideas=ideas))
+    # exit()
 
     # img_list_des = {'video_0': {'idea_1': 'Hai loại trà ô long ướp hoa sen và trà xanh ướp hoa sen của Việt Nam đã được thương hiệu Mariage Frères xếp vào dòng sản phẩm cao cấp nhất, với giá bán hơn 1.000 euro/ký.', 'idea_3': 'Ngành trà Việt Nam đang tăng trưởng nhờ lối sống thay đổi và nhận thức cao về lợi ích sức khỏe của việc uống trà.'}, 'video_1': {'idea_2': 'Trà Việt Nam bắt đầu được xuất khẩu sang phương Tây từ thế kỷ 17 thông qua các công ty Đông Ấn Hà Lan và Anh.', 'idea_4': 'Ông Thân Dỹ Ngữ, Giám đốc Công ty TNHH Hiệp Thành, là người đưa trà Việt Nam vào kệ của Mariage Frères và đã thành công trong việc quảng bá trà Việt Nam ra thế giới.'}, 'video_2': {'idea_5': 'Việt Nam hiện có khoảng 120.000 héc ta diện tích trồng trà và mục tiêu mở rộng lên 135.000-140.000 héc ta vào năm 2030.'}}
     # img_list_des = {'video_0': {'idea_1': 'Các quỹ phòng hộ đã đồng loạt bán tháo cổ phiếu năng lượng với tốc độ nhanh nhất kể từ tháng 9/2024 do giá dầu lao dốc.', 'idea_2': 'Giá dầu thô đã giảm hơn 10 USD trong một tuần sau thỏa thuận ngừng bắn giữa Israel và Iran, gây áp lực lên thị trường năng lượng.'}, 'video_1': {'idea_3': 'Xu hướng rút vốn khỏi cổ phiếu năng lượng mạnh mẽ hơn ở châu Âu, nơi các quỹ không chỉ cắt giảm vị thế mua mà còn gia tăng bán khống.', 'idea_4': 'Mặc dù có đợt bán tháo cổ phiếu năng lượng, các quỹ vẫn mua cổ phiếu mạnh nhất trong 5 tuần qua, chuyển hướng đầu tư sang các ngành tài chính, công nghệ và công nghiệp.'}}

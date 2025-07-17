@@ -15,6 +15,7 @@ class InputGen(BaseModel):
     title: str = ""
     descriptions: str = ""
     image_paths: str = ""
+    abbreviations: str = ""
     
 class Status(BaseModel):
     sess_id: str = ""

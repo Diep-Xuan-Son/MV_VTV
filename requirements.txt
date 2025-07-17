@@ -3,6 +3,7 @@ rq
 loguru
 #torchaudio
 opencv-python-headless
+python-dotenv
 
 langchain-core
 langchain-google-genai
@@ -11,6 +12,8 @@ langchain_openai
 #----for database----
 minio
 redis
+confluent-kafka
+aiokafka
 
 # ----tts----
 munch
@@ -20,3 +23,4 @@ espeakng-loader
 nltk
 soundfile
 librosa
+nvidia-ml-py

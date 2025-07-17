@@ -5,10 +5,13 @@ import json
 import asyncio
 import requests
 import threading
+import pandas as pd
 from PIL import Image
 import streamlit as st
 from io import BytesIO
+from minio import Minio
 from datetime import datetime
+from minio.error import S3Error
 
 if "sess_id" not in st.session_state:
     st.session_state["sess_id"] = str(uuid.uuid4())
@@ -25,8 +28,49 @@ if 'title_video' not in st.session_state:
 if 'video_path' not in st.session_state:
     st.session_state["video_path"] = ""
 
+if 'minio_client' not in st.session_state:
+    st.session_state.minio_client = None
+
+
+def init_minio_client(endpoint, access_key, secret_key, secure=True):
+    """Initialize MinIO client"""
+    try:
+        client = Minio(
+            endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            secure=secure
+        )
+        return client
+    except Exception as e:
+        st.error(f"Failed to connect to MinIO: {str(e)}")
+        return None
+
+def get_from_minio(client, bucket_name, file_name):
+    bucket_name = bucket_name.replace("_", "-")
+    # print(bucket_name)
+    print(file_name)
+    objects_exist = client.list_objects(bucket_name, prefix=os.path.split(file_name)[0], recursive=True)
+    objects_exist = [x.object_name for x in objects_exist]
+    try:
+        if file_name in objects_exist:
+            response = client.get_object(bucket_name, file_name)
+            return response.read()
+        else:
+            return None
+    except S3Error as e:
+        st.error(f"MinIO download error: {str(e)}")
+        return None
+
+st.session_state.minio_client = init_minio_client(
+    os.getenv('MINIO_URL', "localhost:8500"), 
+    "demo", 
+    "demo123456", 
+    False
+)
+
 def update_status_data(sess_id, type):
-    url = "http://localhost:8387/api/getStatus"
+    url = "http://localhost:8507/api/getStatus"
     
     headers = {
         'Content-Type': 'application/json'
@@ -51,17 +95,20 @@ def update_status_data(sess_id, type):
             text_response = "Analyzing Successfully!"
             result = json.loads(content['result'])
             descriptions = result["img_des"]
-            image_paths = result["img_path"]
+            image_paths = result["img_path_new"]
+            abbreviations = result["img_abbreviation"]
             title = result["title"]
 
             for i, (v_id, des) in enumerate(descriptions.items()):
                 images_data.append({
                     'v_id': v_id,
                     'description': des,
-                    'image_path': image_paths[v_id]
+                    'image_path': image_paths[v_id],
+                    'abbreviation': abbreviations[v_id]
                 })
 
         elif status=="error":
+            print(content)
             text_response = f"Can't analyze because {json.loads(content['result'])['error']}"
     else:
         percent = 0
@@ -73,7 +120,7 @@ def update_status_data(sess_id, type):
     return percent, status, text_response, title, images_data
 
 def update_status_video(sess_id, type):
-    url = "http://localhost:8387/api/getStatus"
+    url = "http://localhost:8507/api/getStatus"
     
     headers = {
         'Content-Type': 'application/json'
@@ -99,6 +146,7 @@ def update_status_video(sess_id, type):
             video_path = result["result_path"]
 
         elif status=="error":
+            print(content)
             text_response = f"Can't create video because {json.loads(content['result'])['error']}"
     else:
         percent = 0
@@ -108,8 +156,23 @@ def update_status_video(sess_id, type):
     
     return percent, status, text_response, video_path
 
+def delete_session(sess_id: str, type: str):
+    url = "http://localhost:8507/api/deleteSession"
+
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    
+    payload = json.dumps({
+        "sess_id": sess_id,
+        "type": type
+    })
+    res = requests.request("POST", url, headers=headers, data=payload)
+
+    print(res)
+
 def get_data(sess_id: str, url_input: str):
-    url = "http://localhost:8387/api/getData"
+    url = "http://localhost:8507/api/getDataCache"
 
     headers = {
         'Content-Type': 'application/json'
@@ -153,12 +216,14 @@ def create_video(sess_id, title, images_data):
     v_ids = []
     descriptions = []
     image_paths = []
+    abbreviations = []
     for dt in images_data:
         v_ids.append(dt['v_id'])
         descriptions.append(dt['description'])
         image_paths.append(dt['image_path'])
+        abbreviations.append(dt['abbreviation'])
 
-    url = "http://localhost:8387/api/createVideo"
+    url = "http://localhost:8507/api/createVideoCache"
 
     headers = {
         'Content-Type': 'application/json'
@@ -168,8 +233,10 @@ def create_video(sess_id, title, images_data):
         "sess_id": sess_id,
         "title": title,
         "descriptions": json.dumps(dict(zip(v_ids, descriptions))),
-        "image_paths": json.dumps(dict(zip(v_ids, image_paths)))
+        "image_paths": json.dumps(dict(zip(v_ids, image_paths))),
+        "abbreviations": json.dumps(dict(zip(v_ids, abbreviations)))
     })
+
 
     res = requests.request("POST", url, headers=headers, data=payload)
 
@@ -209,6 +276,7 @@ if send_button and url_input.strip():
     status_text = st.empty()
     with st.spinner("Analyzing URL ..."):
         # st.session_state["title_video"], st.session_state["images_data"] = get_data(st.session_state["sess_id"], url_input)
+        delete_session(st.session_state["sess_id"], "data")
         thread = threading.Thread(target=get_data, args=(st.session_state["sess_id"], url_input,), daemon=True)
         thread.start()
         st.session_state["processed_url"] = url_input
@@ -223,10 +291,19 @@ if send_button and url_input.strip():
                 break
             elif status == "error":
                 st.error(f"❌ {text_response}")
+                break
         progress_bar.empty()
         status_text.empty()
 
-print(st.session_state["images_data"])
+# data_json = {'Đà Nẵng': 'Đà Nẵng', 'Future Homes': 'Future Homes', 'Masterise Homes': 'Masterise Homes', 'Vinhomes': 'Vinhomes', '2/7/2025': 'ngày hai tháng bảy năm hai nghìn không trăm hai mươi lăm'}
+# df = pd.DataFrame(data_json.items(), columns=['abbreviation', 'transcription'])
+# edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic")
+# abbreviation_transcription = edited_df.to_dict(orient='list')
+# print(abbreviation_transcription)
+# data_json_new = dict(zip(abbreviation_transcription['abbreviation'], abbreviation_transcription['transcription']))
+# print(data_json_new)
+
+# print(st.session_state["images_data"])
 # Display extracted images
 if st.session_state["images_data"]:
     st.header("2. Edit Image Descriptions")
@@ -247,37 +324,69 @@ if st.session_state["images_data"]:
 
     for i, img_data in enumerate(st.session_state["images_data"]):
         with st.expander(f"Image {i+1}", expanded=True):
-            col1, col2 = st.columns([1, 2])
+            col1, col2, col3 = st.columns([2, 2, 2])
 
             with col1:
-                if not os.path.exists(img_data['image_path']):
+                # if not os.path.exists(img_data['image_path']):
+                #     uploaded_file = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"], key=f"uploader_key_{i}")
+                #     if uploaded_file is not None:
+                #         # Save uploaded file to disk
+                #         with open(img_data['image_path'], "wb") as f:
+                #             f.write(uploaded_file.read())
+                #         st.rerun()
+
+                # else:    
+                #     img_pil = Image.open(img_data['image_path'])
+                #     st.image(img_pil, caption=f"Image {i+1}", use_container_width=True)
+
+                image_bytes = get_from_minio(
+                    st.session_state.minio_client, 
+                    "data_mvvtv", 
+                    img_data['image_path']
+                )
+                if not image_bytes:
                     uploaded_file = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"], key=f"uploader_key_{i}")
                     if uploaded_file is not None:
                         # Save uploaded file to disk
-                        with open(img_data['image_path'], "wb") as f:
-                            f.write(uploaded_file.read())
+                        # with open(img_data['image_path'], "wb") as f:
+                        #     f.write(uploaded_file.read())
+                        img_bytes = uploaded_file.read()
+                        st.session_state.minio_client.put_object(
+                            bucket_name="data-mvvtv", object_name=img_data['image_path'], data=BytesIO(img_bytes), length=len(img_bytes),
+                        )
                         st.rerun()
+                else:
+                    st.image(image_bytes, caption=f"Image {i+1}", use_container_width=True)
 
-                else:    
-                    img_pil = Image.open(img_data['image_path'])
-                    st.image(img_pil, caption=f"Image {i+1}", use_container_width=True)
                 # Delete Button
                 if st.button(f"Delete Image", key=f"delete_button_{i}"):
-                    os.remove(img_data['image_path'])
+                    # os.remove(img_data['image_path'])
+                    st.session_state.minio_client.remove_object(bucket_name="data-mvvtv", object_name=img_data['image_path'])
                     st.rerun()
 
             with col2:
                 new_description = st.text_area(
-                    "Description:",
+                    "### Description:",
                     value=img_data['description'],
                     key=f"desc_{i}",
                     height=100
                 )
-                
                 if st.button(f"Update description", key=f"update_des_button_{i}"):
                     # Update the description in session state
                     st.session_state["images_data"][i]['description'] = new_description
                     st.success(f"✅ Update description success!")
+                    st.rerun()
+
+            with col3:
+                st.write("Abbreviation:")
+                df = pd.DataFrame(img_data['abbreviation'].items(), columns=['Abbreviation', 'Transcription'])
+                edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic", key=f"abbreviation_{i}")
+                if st.button(f"Update abbreviation", key=f"update_abb_button_{i}"):
+                    edited_df = edited_df.dropna()
+                    abbreviation_transcription = edited_df.to_dict(orient='list')
+                    abbreviation_new = dict(zip(abbreviation_transcription['Abbreviation'], abbreviation_transcription['Transcription']))
+                    st.session_state["images_data"][i]['abbreviation'] = abbreviation_new
+                    st.success(f"✅ Update abbreviation success!")
                     st.rerun()
 
     # Video creation section
@@ -286,6 +395,7 @@ if st.session_state["images_data"]:
         progress_bar = st.progress(0)
         status_text = st.empty()
         with st.spinner("Creating video ..."):
+            delete_session(st.session_state["sess_id"], "video")
             # st.session_state["video_path"] = create_video(st.session_state["sess_id"], st.session_state["title_video"], st.session_state["images_data"])
             thread = threading.Thread(target=create_video, args=(st.session_state["sess_id"], st.session_state["title_video"], st.session_state["images_data"],), daemon=True)
             thread.start()
@@ -301,15 +411,27 @@ if st.session_state["images_data"]:
                     break
                 elif status == "error":
                     st.error(f"❌ {text_response}")
+                    break
             progress_bar.empty()
             status_text.empty()
 
-    if os.path.exists(st.session_state["video_path"]):
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col2:
-            with open(st.session_state["video_path"], 'rb') as video_file:
-                video_bytes = video_file.read()
-                st.video(video_bytes, format="video/mp4")
+    # if os.path.exists(st.session_state["video_path"]):
+    #     col1, col2, col3 = st.columns([1, 1, 2])
+    #     with col2:
+    #         with open(st.session_state["video_path"], 'rb') as video_file:
+    #             video_bytes = video_file.read()
+    #             st.video(video_bytes, format="video/mp4")
+
+    if st.session_state["video_path"]:
+        video_bytes = get_from_minio(
+            st.session_state.minio_client, 
+            "data_mvvtv", 
+            st.session_state["video_path"]
+        )
+        if video_bytes:
+            col1, col2, col3 = st.columns([1, 1, 2])
+            with col2:
+                st.video(video_bytes)
 
 # Footer
 st.markdown("---")

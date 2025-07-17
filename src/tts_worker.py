@@ -9,6 +9,7 @@ if str(ROOT) not in sys.path:
 import os
 import torch
 import asyncio
+from pynvml import *
 import soundfile as sf
 from StyleTTS2.inference import StyleTTS2
 
@@ -29,8 +30,24 @@ class TTS(object):
                                 "lang": "vi",   #Default language
                                 "speed": 1.0,   #Speaking speed
                             }
-        # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cuda' if torch.cuda.is_available() and device!="cpu" else 'cpu'
+
+        if torch.cuda.is_available() and device!="cpu":
+            nvmlInit()
+            device_count = nvmlDeviceGetCount()
+            mem_free = 0
+            for i in range(device_count):
+                handle = nvmlDeviceGetHandleByIndex(i)
+                mem = nvmlDeviceGetMemoryInfo(handle)
+                print(f"Free VRAM: {mem.free/1024**2}")
+                mem_free += mem.free
+            if mem_free > 484*2.6:
+                self.device = "cuda"
+            else:
+                self.device = "cpu"
+        else:
+            self.device = "cpu"
+
+        # self.device = 'cuda' if torch.cuda.is_available() and device!="cpu" else 'cpu'
         self.model = StyleTTS2(config_path, self.model_path, nltk_data_path).eval().to(self.device)
 
     async def __call__(self, text: str, output_dir: str, reference_path: list=[], default_speaker: str="[id_1]", avg_style: bool=True, stabilize: bool=True, denoise: float=0.6, n_merge: int=20):

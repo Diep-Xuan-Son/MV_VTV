@@ -189,9 +189,9 @@ class VideoEditorWorker(object):
             infor_merge += f"[{next_ov_output}]"
 
         if fast:
-            cmd = ['ffmpeg', '-y', '-loop', '0', '-i', bg_image_path] + inputs + ['-filter_complex', f'{infor_input}{infor_overlay}{infor_merge} concat=n={len(list_overlay_image)}:v=1:a=0', '-t', str(sum(list_duration)), '-c:v', "h264_nvenc", "-preset", "fast", "-c:a", "copy", output_path]
+            cmd = ['ffmpeg', '-y', '-loop', '0', '-i', bg_image_path] + inputs + ['-filter_complex', f'{infor_input}{infor_overlay}{infor_merge} concat=n={len(list_overlay_image)}:v=1:a=0', '-t', str(sum(list_duration)), '-c:v', "h264_nvenc", "-preset", "fast", "-c:a", "copy", "-r", "30", output_path]
         else:
-            cmd = ['ffmpeg', '-y', '-loop', '0', '-i', bg_image_path] + inputs + ['-filter_complex', f'{infor_input}{infor_overlay}{infor_merge} concat=n={len(list_overlay_image)}:v=1:a=0', '-t', str(sum(list_duration)), '-c:v', 'libx264', output_path]
+            cmd = ['ffmpeg', '-y', '-loop', '0', '-i', bg_image_path] + inputs + ['-filter_complex', f'{infor_input}{infor_overlay}{infor_merge} concat=n={len(list_overlay_image)}:v=1:a=0', '-t', str(sum(list_duration)), '-c:v', 'libx264', "-preset", "fast", "-r", "30", output_path]
 
         print(f"----cmd: {cmd}")
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -326,7 +326,7 @@ class VideoEditorWorker(object):
                 
                 # text_infos += f"drawtext=text='{word}':fontcolor={fontcolor}:fontsize={self.font.size}:fontfile={fontfile}:x={x_word}:y='h - ({y_word}+text_h+{num_accent}*text_h/4)*(1/(1+exp(-4*(t-{wt})+1)))':alpha='if(lt(t\,{wt+0.3})\, 0\, if(lt(t\,{wt+1})\, (t\-0.5)/{wt+0.5}\, 1))':enable='between(t,{wt},{time_end})',"
                 # text_infos += f"drawtext=text='{word}':fontcolor={fontcolor}:fontsize={self.font.size}:fontfile={fontfile}:x={x_word}:y='(h-{y_word}) - (text_h+{accent_ratio}*text_h)*(1/(1+exp(-15*(t-{wt})+10)))':alpha='if(lt(t\,{wt+0.6})\, 0\, if(lt(t\,{wt+1})\, (t\-0.6)/{wt+0.6}\, 1))':enable='between(t,{wt},{time_end})',"
-                text_infos += f"drawtext=text='{word}':fontcolor={fontcolor}:fontsize={font.size}:fontfile={fontfile}:x={x_word}:y='(h-{y_word}) - (ascent)*(1/(1+exp(-15*(t-{wt})+10)))':alpha='if(lt(t\,{wt+0.6})\, 0\, if(lt(t\,{wt+1})\, (t\-0.6)/{wt+0.6}\, 1))':enable='between(t,{wt},{time_end})',"     # can also use word_ascent instead of ascent if you want to custom
+                text_infos += f"drawtext=text='{word}':fontcolor={fontcolor}:fontsize={font.size}:fontfile={fontfile}:x={x_word}:y='(h-{y_word}+{h_word}) - ({h_word}+ascent)*(1/(1+exp(-15*(t-{wt})+10)))':alpha='if(lt(t\,{wt+0.6})\, 0\, if(lt(t\,{wt+1})\, (t\-0.6)/{wt+0.6}\, 1))':enable='between(t,{wt},{time_end})',"     # can also use word_ascent instead of ascent if you want to custom
                 
                 if "\n" in word:
                     x_word = padding_left
@@ -336,9 +336,9 @@ class VideoEditorWorker(object):
         # exit()
 
         if fast:
-            cmd = ['ffmpeg', "-y", "-i", video_input_path, "-vf", text_infos[:-1], "-c:v", "h264_nvenc", "-preset", "fast", "-c:a", "copy", video_output_path]
+            cmd = ['ffmpeg', "-y", "-i", video_input_path, "-vf", text_infos[:-1], "-c:v", "h264_nvenc", "-preset", "fast", "-c:a", "copy", "-r", "30", video_output_path]
         else:
-            cmd = ['ffmpeg', "-y", "-i", video_input_path, "-vf", text_infos[:-1], "-c:v", "libx264", "-c:a", "copy", video_output_path]
+            cmd = ['ffmpeg', "-y", "-i", video_input_path, "-vf", text_infos[:-1], "-c:v", "libx264", "-c:a", "copy", "-r", "30", video_output_path]
         # print(f"----cmd: {cmd}")
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         stdout, stderr = await proc.communicate()
@@ -381,7 +381,7 @@ if __name__=="__main__":
     # list_duration = [3,4,5,6]
     list_overlay_image = ["./src/static/images/test/anh-man-hinh-2025-06-30-luc-151006-1751271744324832396409-39807437566204113909774.webp", "./src/static/images/test/anh-man-hinh-2025-06-30-luc-152100-17512717443371789887541-24162800044629725962397.webp", "./src/static/images/test/bong-bong--1--09291149322045938356465.png"]
     list_duration = [5,5,5]
-    output_path = "output.mp4"
+    output_path = "data_test/output.mp4"
     # asyncio.run(VEW.overlay_image(bg_image_path, list_overlay_image, list_duration, output_path, False))
     # exit()
 
@@ -390,11 +390,13 @@ if __name__=="__main__":
     # tex t = f"Trong phiên giao dịch ngày 30/6 VN-Index đã **tăng 5.29 điểm** đạt **1.376,73 điểm** với 198 mã tăng và 86 mã giảm. Nhóm ngân hàng tiếp tục là **động lực chính** cho sự tăng trưởng của VN-Index với các mã như TCB và VCB ghi nhận mức tăng tích cực."
     text = f"Thị trường chứng khoán mở cửa với **tâm lý lạc quan**. VN-Index duy trì đà tăng trong phiên sáng. Kết thúc phiên, VN-Index tăng **4.63 điểm**, đạt **1.376.07 điểm**, đánh dấu mức cao mới trong tháng 6. Sàn HOSE ghi nhận **216 mã tăng giá**, cho thấy sự tích cực của thị trường. Nhóm ngành **hóa chất**, **cảng biển** và **nhựa** có sự tăng trưởng mạnh trong phiên giao dịch."
     img_size = [1080,1920]
+    # img_size = [450,800]
     video_input_path = "data_test/output.mp4"
     video_output_path = "data_test/output1.mp4"
     fast = False
     start_time = [0, 15]
     text_position = [160, 160, 160, 420, 1490, 1715]
+    # text_position = [65, 65, 40, 160, 615, 720]
     asyncio.run(VEW.add_text(title, [text], img_size, video_input_path, video_output_path, fast, start_time, text_position))
 
 

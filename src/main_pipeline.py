@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from langchain_openai import ChatOpenAI
 
 from tts_worker import TTS
+from data_worker import DBWorker
 from multi_agent import MultiAgent
 from get_data_url import extract_data
 from video_editor_worker import VideoEditorWorker
@@ -32,6 +33,12 @@ class VideoGeneration(object):
                  tts_config_path: str='./weights/style_tts2/config.yml',
                  nltk_data_path: str='./weights/nltk_data',
                  redis_url="redis://:root@localhost:8389",
+                 redis_password="RedisAuth",
+
+                 minio_url="localhost:9000", 
+                 minio_access_key="demo",
+                 minio_secret_key="demo123456",
+                 bucket_name="data_mmv",
 
                  api_key_openai: str='',
                  api_key_gem: str=''
@@ -66,6 +73,14 @@ class VideoGeneration(object):
         self.MA = MultiAgent(self.llm)
         self.IAW = ImageAnalyzationWorker(api_key_gem)
         self.VEW = VideoEditorWorker()
+        self.dataw = DBWorker(
+            minio_url, 
+            minio_access_key,
+            minio_secret_key,
+            bucket_name,
+            redis_url, 
+            redis_password,
+        )
 
         self.dir_image = f"{DIR}{os.sep}static{os.sep}images"
         self.dir_audio = f"{DIR}{os.sep}static{os.sep}audio_transcribe"
@@ -78,32 +93,33 @@ class VideoGeneration(object):
         #----setup redis----
         # self.db_task_data = "data"
         # self.db_task_create_video = "video"
-        url_redis = urlparse(redis_url)
-        self.redisClient = redis.StrictRedis(host=url_redis.hostname,
-                                            port=url_redis.port,
-                                            password="RedisAuth",
-                                            db=1)
-        if not self.redisClient.hexists("session", "existed"):
+        if not self.dataw.redisClient.hexists("session", "existed"):
             self.list_sess = []
         else:
-            self.list_sess = eval(self.redisClient.hget("session", "existed"))
+            self.list_sess = eval(self.dataw.redisClient.hget("session", "existed"))
+
         #-----------setup cronjob--------
         self.delete_sess_thread = threading.Thread(
             target=self.delete_sess, args=())
         self.delete_sess_thread.start()
 
         self.time_delay = 1
+        self.bucket_name = bucket_name
 
     def delete_sess(self, ):
         while True:
-            time.sleep(10)
+            time.sleep(30)
             for sess_id in self.list_sess:
-                if not self.redisClient.exists(sess_id):
+                if not self.dataw.redisClient.exists(sess_id):
                     sess_image_dir = os.path.join(self.dir_image, sess_id)
                     sess_final_dir = os.path.join(self.dir_final_video, sess_id)
                     sees_audio_dir = os.path.join(self.dir_audio, sess_id)
                     delete_folder_exist(sess_image_dir=sess_image_dir, sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir)
+                    list_sess = eval(self.dataw.redisClient.hget("session", "existed"))
+                    list_sess.remove(sess_id)
                     self.list_sess.remove(sess_id)
+                    self.dataw.redisClient.hset("session", "existed", str(list_sess))
+                    self.dataw.delete_folder_bucket(bucket_name=self.bucket_name, folder_name=sess_id)
 
     def update_status(self, session_id: str, type: str, created_at: str, result: dict, percent: float, status: str):
         status = {
@@ -114,43 +130,47 @@ class VideoGeneration(object):
             "percent": percent,
             "status": status
         }
-        self.redisClient.hset(session_id, type, json.dumps(status))
-        self.redisClient.expire(session_id, 1800)
+        self.dataw.redisClient.hset(session_id, type, json.dumps(status))
+        self.dataw.redisClient.expire(session_id, 1800)
 
     def get_status(self, session_id: str, type: str):
         status = {}
-        if self.redisClient.exists(session_id):
-            status = json.loads(self.redisClient.hget(session_id, type))
+        if self.dataw.redisClient.exists(session_id):
+            status = json.loads(self.dataw.redisClient.hget(session_id, type))
         else:
             {"success": False, "error": "session id doesn't exist"}
         return {"success": True, "result": status}
 
     @MyException()
     async def get_data(self, sess_id: str, url: str):
-        self.update_status(sess_id, "data", str(datetime.now()), {}, 0, "running")
+        self.dataw.update_status(sess_id, "data", str(datetime.now()), {}, 0, "running")
         # ----init folder for sess_id----
         sess_image_dir = os.path.join(self.dir_image, sess_id)
         delete_folder_exist(sess_image_dir=sess_image_dir)
         check_folder_exist(sess_image_dir=sess_image_dir)
+        list_path_delete = [sess_image_dir]
+        # if sess_id not in self.list_sess:
+        #     self.list_sess.append(sess_id)
+        #     self.dataw.redisClient.hset("session", "existed", str(self.list_sess))
+
         if sess_id not in self.list_sess:
             self.list_sess.append(sess_id)
-            self.redisClient.hset("session", "existed", str(self.list_sess))
         #/////////////////////////////
 
         result = extract_data(url=url, path_image_save=sess_image_dir)
         title_original = result["title"]
         content = result["content"]
-        self.update_status(sess_id, "data", str(datetime.now()), {}, 20, "running")
+        self.dataw.update_status(sess_id, "data", str(datetime.now()), {}, 20, "running")
 
         title_updated = await self.MA41.split_title(title=title_original)
         title_updated = title_updated["result"]
-        self.update_status(sess_id, "data", str(datetime.now()), {}, 40, "running")
+        self.dataw.update_status(sess_id, "data", str(datetime.now()), {}, 40, "running")
 
         result = await self.MA.get_idea(text=content, title=title_original)
         # title = result["title"]
         ideas = result.copy()
         # del ideas["title"]
-        self.update_status(sess_id, "data", str(datetime.now()), {}, 50, "running")
+        self.dataw.update_status(sess_id, "data", str(datetime.now()), {}, 50, "running")
 
         vdes = {}
         vipath = {}
@@ -168,10 +188,10 @@ class VideoGeneration(object):
         result = await asyncio.gather(*thread_des)
         result = [d["description_vi"] for d in result]
         vdes.update(dict(zip(thread_vid, result)))
-        self.update_status(sess_id, "data", str(datetime.now()), {}, 80, "running")
+        self.dataw.update_status(sess_id, "data", str(datetime.now()), {}, 80, "running")
 
         img_list_des = await self.MA.select_idea(description=vdes, ideas=ideas)
-        self.update_status(sess_id, "data", str(datetime.now()), {}, 90, "running")
+        self.dataw.update_status(sess_id, "data", str(datetime.now()), {}, 90, "running")
         img_list_des_new = {}
         for vid, list_des in img_list_des.items():
             des = [f"{k}: {v}" for k, v in list_des.items()]
@@ -181,24 +201,30 @@ class VideoGeneration(object):
         img_des = await self.MA.synthesize_idea(ideas=img_list_des_new, title=title_original)
         img_des_new = {k: v for k, v in img_des.items() if k in list(img_list_des)}
 
-        return {"success": True, "title": title_updated, "img_des": img_des_new, "img_path": vipath}
+        img_abbreviation = await self.MA41.rewrite_abbreviation(news=img_des)
+
+        return {"success": True, "title": title_updated, "img_des": img_des_new, "img_path": vipath, "img_abbreviation": img_abbreviation, "list_path_delete": list_path_delete}
 
     @MyException()
-    async def run(self, sess_id: str, title_updated: str, img_des: dict, vipath: dict):
-        self.update_status(sess_id, "video", str(datetime.now()), {}, 0, "running")
+    async def run(self, sess_id: str, title_updated: str, img_des: dict, vipath: dict, img_abbreviation: dict):
+        self.dataw.update_status(sess_id, "video", str(datetime.now()), {}, 0, "running")
         # ----init folder for sess_id----
+        sess_image_dir = os.path.join(self.dir_image, sess_id)
         sess_final_dir = os.path.join(self.dir_final_video, sess_id)
         sees_audio_dir = os.path.join(self.dir_audio, sess_id)
-        delete_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir)
-        check_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir)
+        delete_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir, sess_image_dir=sess_image_dir)
+        check_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir, sess_image_dir=sess_image_dir)
+        # if sess_id not in self.list_sess:
+        #     self.list_sess.append(sess_id)
+        #     self.dataw.redisClient.hset("session", "existed", str(self.list_sess))
+
         if sess_id not in self.list_sess:
             self.list_sess.append(sess_id)
-            self.redisClient.hset("session", "existed", str(self.list_sess))
-        list_path_delete = [sees_audio_dir, sess_final_dir]
+        list_path_delete = [sees_audio_dir, sess_final_dir, sess_image_dir]
         #/////////////////////////////
 
-        img_abbreviation = await self.MA41.rewrite_abbreviation(news=img_des)
-        self.update_status(sess_id, "video", str(datetime.now()), {}, 10, "running")
+        # img_abbreviation = await self.MA41.rewrite_abbreviation(news=img_des)
+        self.dataw.update_status(sess_id, "video", str(datetime.now()), {}, 10, "running")
 
         # img_des = {'video_1': '**Trà Việt Nam** đã bắt đầu được **xuất khẩu sang phương Tây** từ thế kỷ 17. Ông **Thân Dỹ Ngữ**, Giám đốc Công ty TNHH Hiệp Thành, đã thành công trong việc **quảng bá trà Việt Nam** ra thế giới.', 'video_0': 'Hai loại **trà ô long ướp hoa sen** và **trà xanh ướp hoa sen** của Việt Nam được thương hiệu **Mariage Frères** xếp vào dòng sản phẩm **cao cấp nhất**. Giá bán lên tới **hơn 1.000 euro/ký**. Ngành trà Việt Nam đang **tăng trưởng** nhờ lối sống thay đổi và nhận thức cao về **lợi ích sức khỏe** của việc uống trà.', 'video_2': 'Việt Nam hiện có khoảng **120.000 héc ta** diện tích trồng trà. Mục tiêu mở rộng lên **135.000-140.000 héc ta** vào năm 2030.'}
         # img_abbreviation = {'video_1': {'TNHH': 'Trách Nhiệm Hữu Hạn', 'thế kỷ 17': 'thế kỷ mười bảy'}, 'video_0': {'1.000 euro/ký': 'một nghìn euro trên một ký'}, 'video_2': {'120.000 héc ta': 'một trăm hai mươi nghìn héc ta', '135.000-140.000 héc ta': 'một trăm ba mươi lăm nghìn đến một trăm bốn mươi nghìn héc ta', '2030': 'hai nghìn không trăm ba mươi'}}
@@ -207,6 +233,10 @@ class VideoGeneration(object):
         # img_des = {'video_1': 'Ông **Thân Dỹ Ngữ**, Giám đốc Công ty TNHH Hiệp Thành, là người tiên phong trong việc đưa **trà Việt Nam** vào thị trường **châu Âu**. Ông đã thành công trong việc khôi phục **niềm tin** của khách hàng quốc tế.', 'video_0': '**Trà Việt Nam** đang dần khẳng định vị thế trên thị trường quốc tế. Các sản phẩm cao cấp như **trà oolong ướp hoa sen** và **trà xanh ướp hoa sen** được bán tại **Mariage Frères**.', 'video_3':'Việt Nam hiện có khoảng **120.000 héc ta** diện tích trồng trà. Mục tiêu mở rộng lên **135.000-140.000 héc ta** vào năm **2030**, với tỷ lệ trà an toàn đạt **75%**.', 'video_2': 'Ngành trà Việt Nam đã có **lịch sử xuất khẩu** từ thế kỷ 17. Sự tham gia của các công ty nước ngoài như **Công ty Đông Ấn Hà Lan** và **Anh** đã góp phần vào sự phát triển này.'}
         # img_abbreviation = {'video_1': {'TNHH': 'Trách Nhiệm Hữu Hạn', 'châu Âu': 'châu Âu', 'niềm tin': 'niềm tin'}, 'video_0': {'Trà Việt Nam': 'Trà Việt Nam', 'Mariage Frères': 'Mariage Frères'}, 'video_3': {'120.000 héc ta': 'một trăm hai mươi nghìn héc ta', '135.000-140.000 héc ta': 'một trăm ba mươi lăm nghìn đến một trăm bốn mươi nghìn héc ta', '2030': 'hai nghìn không trăm ba mươi', '75%': 'bảy mươi lăm phần trăm'}, 'video_2': {'lịch sử xuất khẩu': 'lịch sử xuất khẩu', 'Công ty Đông Ấn Hà Lan': 'Công ty Đông Ấn Hà Lan', 'Anh': 'Anh'}}
         # vipath = {'video_1': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/uong-tra-2-copy.jpg', "video_0": '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/screenshot-54-22892885959342895322244.png', 'video_3':'/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/tra-sen3-copy.jpg', 'video_2': '/home/mq/disk2T/son/code/GitHub/MV_VTV/src/static/images/01e4992a-6ecf-4447-84e8-c24ea6e3fcf5/tra-sen2-copy.jpg'}
+
+        for v_id, path in vipath.items():
+            res = self.dataw.download_file(bucket_name=self.bucket_name, object_name=path, folder_local=sess_image_dir)
+            vipath[v_id] = res["file_path"]
 
         audios = {}
         list_des = []
@@ -246,22 +276,22 @@ class VideoGeneration(object):
 
             list_overlay_image.append(vipath[v_id])
             list_duration.append(duration)
-            self.update_status(sess_id, "video", str(datetime.now()), {}, 10 + round((j+1)*60/len(img_des),2) , "running")
+            self.dataw.update_status(sess_id, "video", str(datetime.now()), {}, 10 + round((j+1)*60/len(img_des),2) , "running")
         list_duration[-1] = list_duration[-1] + 2
 
         overlay_path = f"{sess_final_dir}{os.sep}overlay_video.mp4"
         result = await self.VEW.overlay_image(self.bg_image_path, list_overlay_image, list_duration, overlay_path, False)
         bg_sz = result["bg_size"]
-        self.update_status(sess_id, "video", str(datetime.now()), {}, 80, "running")
+        self.dataw.update_status(sess_id, "video", str(datetime.now()), {}, 80, "running")
 
         overlay_text_path = f"{sess_final_dir}{os.sep}overlay_text_video.mp4"
         result = await self.VEW.add_text(title_updated, list_des, bg_sz, overlay_path, overlay_text_path, False, [0] + list_duration_text, [160, 160, 160, 420, 1490, 1715])
-        self.update_status(sess_id, "video", str(datetime.now()), {}, 90, "running")
+        self.dataw.update_status(sess_id, "video", str(datetime.now()), {}, 90, "running")
 
-        final_video_audio_file = f"{sess_final_dir}{os.sep}final_video.mp4"
+        final_video_audio_file = f"{sess_final_dir}{os.sep}final_video_{sess_id}.mp4"
         result = await self.VEW.add_audio(overlay_text_path, list(audios.values()), [200] + list_duration_audio[:-1], f"{DIR}/data/audio_background/ba2.mp3", final_video_audio_file)
 
-        return {"success": True, "result_path": final_video_audio_file}
+        return {"success": True, "result_path": final_video_audio_file, "list_path_delete": list_path_delete}
 
 if __name__=="__main__":
     SECRET_KEY     = os.getenv('SECRET_KEY', "MMV")
