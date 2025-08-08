@@ -17,7 +17,7 @@ from multi_agent import MultiAgent
 from get_data_url import extract_data
 from video_editor_worker import VideoEditorWorker
 from image_analyzation_worker import ImageAnalyzationWorker
-from libs.utils import MyException, check_folder_exist, delete_folder_exist
+from libs.utils import MyException, check_folder_exist, delete_folder_exist, logging
 
 import sys
 from pathlib import Path 
@@ -26,6 +26,10 @@ DIR = FILE.parents[0]
 ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
+
+# LOGGER = logging.getLogger("main_pipeline")
+# FILE_HANDLER = logging.FileHandler(f"{Config.PATH_LOG}{os.sep}main_pipeline_{datetime.now().strftime('%Y_%m_%d')}.log")
+# LOGGER.addHandler(FILE_HANDLER)
 
 class VideoGeneration(object):
     def __init__(self, 
@@ -113,8 +117,8 @@ class VideoGeneration(object):
                 if not self.dataw.redisClient.exists(sess_id):
                     sess_image_dir = os.path.join(self.dir_image, sess_id)
                     sess_final_dir = os.path.join(self.dir_final_video, sess_id)
-                    sees_audio_dir = os.path.join(self.dir_audio, sess_id)
-                    delete_folder_exist(sess_image_dir=sess_image_dir, sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir)
+                    sess_audio_dir = os.path.join(self.dir_audio, sess_id)
+                    delete_folder_exist(sess_image_dir=sess_image_dir, sess_final_dir=sess_final_dir, sess_audio_dir=sess_audio_dir)
                     list_sess = eval(self.dataw.redisClient.hget("session", "existed"))
                     list_sess.remove(sess_id)
                     self.list_sess.remove(sess_id)
@@ -211,16 +215,16 @@ class VideoGeneration(object):
         # ----init folder for sess_id----
         sess_image_dir = os.path.join(self.dir_image, sess_id)
         sess_final_dir = os.path.join(self.dir_final_video, sess_id)
-        sees_audio_dir = os.path.join(self.dir_audio, sess_id)
-        delete_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir, sess_image_dir=sess_image_dir)
-        check_folder_exist(sess_final_dir=sess_final_dir, sees_audio_dir=sees_audio_dir, sess_image_dir=sess_image_dir)
+        sess_audio_dir = os.path.join(self.dir_audio, sess_id)
+        delete_folder_exist(sess_final_dir=sess_final_dir, sess_audio_dir=sess_audio_dir, sess_image_dir=sess_image_dir)
+        check_folder_exist(sess_final_dir=sess_final_dir, sess_audio_dir=sess_audio_dir, sess_image_dir=sess_image_dir)
         # if sess_id not in self.list_sess:
         #     self.list_sess.append(sess_id)
         #     self.dataw.redisClient.hset("session", "existed", str(self.list_sess))
 
         if sess_id not in self.list_sess:
             self.list_sess.append(sess_id)
-        list_path_delete = [sees_audio_dir, sess_final_dir, sess_image_dir]
+        list_path_delete = [sess_audio_dir, sess_final_dir, sess_image_dir]
         #/////////////////////////////
 
         # img_abbreviation = await self.MA41.rewrite_abbreviation(news=img_des)
@@ -259,7 +263,7 @@ class VideoGeneration(object):
             for i, sd in enumerate(sub_des_rewrite):
                 if i+1==len(sub_des_rewrite):
                     time_delay = self.time_delay*2
-                output_dir = await self.ttsw(text=regex.sub(r'[\*\*]', '', sd.rstrip(". ")), output_dir=sees_audio_dir, reference_path=[f"{DIR}/StyleTTS2/reference_audio/vn_1.wav"])
+                output_dir = await self.ttsw(text=regex.sub(r'[\*\*]', '', sd.rstrip(". ")), output_dir=sess_audio_dir, reference_path=[f"{DIR}/StyleTTS2/reference_audio/vn_1.wav"])
                 audios[f"{v_id}_{i}"] = output_dir
                 # duration_audio += (len(sd.split())//5 + self.time_delay)*1000 + 600
                 audio_time = await self.VEW.get_duration(output_dir)

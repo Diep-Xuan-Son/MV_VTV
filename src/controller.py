@@ -4,6 +4,7 @@ import uuid
 import uvicorn
 import re as regex
 from itertools import chain
+from datetime import datetime
 from dataclasses import dataclass, field
 from string import ascii_letters, digits, punctuation
 
@@ -13,26 +14,32 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, SystemMessage
 from models import InputUrl, InputGen, Status
 
+from libs.utils import logging, formatter
+LOGGER = logging.getLogger("controller")
+FILE_HANDLER = logging.FileHandler(f"{Config.PATH_LOG}{os.sep}controller_{datetime.now().strftime('%Y_%m_%d')}.log")
+FILE_HANDLER.setFormatter(formatter)
+LOGGER.addHandler(FILE_HANDLER)
+
 @app.post("/api/getData")
 @HTTPException() 
 async def getData(inputs: InputUrl = Body(...)):
     urls = regex.findall(r'https?://[^\s]+', inputs.url)
     url = urls[-1] if urls else None
     result = await MULTIW.VG.get_data(sess_id=inputs.sess_id, url=url)
-    VG.dataw.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 100, "done")
+    VG.dataw.update_status(inputs.sess_id, "data", str(datetime.now()), result, 100, "done")
     if not result["success"]:
-        VG.dataw.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), result, 0, "error")
+        VG.dataw.update_status(inputs.sess_id, "data", str(datetime.now()), result, 0, "error")
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=201, content=result)
 
 @app.post("/api/createVideo")
 @HTTPException() 
 async def createVideo(inputs: InputGen = Body(...)):
-    print(inputs)
+    LOGGER.info(inputs)
     result = await MULTIW.VG.run(inputs.sess_id, inputs.title, ast.literal_eval(inputs.descriptions), ast.literal_eval(inputs.image_paths))
-    VG.dataw.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 100, "done")
+    VG.dataw.update_status(inputs.sess_id, "video", str(datetime.now()), result, 100, "done")
     if not result["success"]:
-        VG.dataw.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), result, 0, "error")
+        VG.dataw.update_status(inputs.sess_id, "video", str(datetime.now()), result, 0, "error")
         return JSONResponse(status_code=500, content=result["error"])
     return JSONResponse(status_code=201, content=result)
 
@@ -61,13 +68,13 @@ async def getData(inputs: InputUrl = Body(...)):
             list_sess.append(inputs.sess_id)
         MULTIW.VG.dataw.redisClient.hset("session", "existed", str(list_sess))
 
-    MULTIW.VG.dataw.update_status(inputs.sess_id, "data", str(datetime.datetime.now()), {}, 0, "pending")
+    MULTIW.VG.dataw.update_status(inputs.sess_id, "data", str(datetime.now()), {}, 0, "pending")
     return JSONResponse(status_code=201, content=str(f"Message delivered to {Config.TOPIC_DATA}"))
 
 @app.post("/api/createVideoCache")
 @HTTPException() 
 async def createVideoCache(inputs: InputGen = Body(...)):
-    print(inputs)
+    LOGGER.info(inputs)
     producer = app.state.producer
     await producer.send_and_wait(
         Config.TOPIC_QUERY,
@@ -84,7 +91,7 @@ async def createVideoCache(inputs: InputGen = Body(...)):
             list_sess.append(inputs.sess_id)
         MULTIW.VG.dataw.redisClient.hset("session", "existed", str(list_sess))
 
-    MULTIW.VG.dataw.update_status(inputs.sess_id, "video", str(datetime.datetime.now()), {}, 0, "pending")
+    MULTIW.VG.dataw.update_status(inputs.sess_id, "video", str(datetime.now()), {}, 0, "pending")
     return JSONResponse(status_code=201, content=str(f"Message delivered to {Config.TOPIC_QUERY}"))
 
 @app.post("/api/getStatus")

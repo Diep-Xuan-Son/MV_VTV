@@ -1,0 +1,74 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+Mẫu 1
+{
+  "title": "Bản Tin Tổng Hợp Ngày 6/8/2025",
+  "published_at": "2025-08-06 09:00:00",
+  "summary": "Video này tổng hợp những tin tức nổi bật trong ngày, từ tình hình kinh tế toàn cầu đến cảnh báo thiên tai và các tiến bộ công nghệ mới nhất.",
+  "category": "bất động sản",
+  "thumb": ["https://example.com/thumbnails/video_main_thumb1.jpg", "https://example.com/thumbnails/video_main_thumb2.jpg"],
+  "articles": [
+    {
+      "title": "Thị Trường Toàn Cầu Tăng Trưởng Mạnh Mẽ",
+      "summary": "Chứng khoán thế giới tăng điểm khi các nhà đầu tư phản ứng tích cực với dữ liệu kinh tế khả quan cho thấy đà phục hồi mạnh.",
+      "thumb": ["https://example.com/thumbnails/article11.jpg", "https://example.com/thumbnails/article12.jpg"],
+      "source": "vtvmoney"
+    },
+    {
+      "title": "Bão Hector Đang Tiến Gần Bờ Đông",
+      "summary": "Cơ quan chức năng khuyến cáo người dân chuẩn bị đối phó với bão Hector, dự kiến sẽ đổ bộ trong vòng 48 giờ tới.",
+      "thumb": ["https://example.com/thumbnails/article21.jpg", "https://example.com/thumbnails/article22.jpg"],
+      "source": "vnexpress"
+    },
+    {
+      "title": "Đột Phá Trong Y Tế Sử Dụng Trí Tuệ Nhân Tạo",
+      "summary": "Một nhóm nghiên cứu đã phát triển hệ thống AI có khả năng phát hiện sớm các dấu hiệu rối loạn thần kinh với độ chính xác lên đến 92%.",
+      "thumb": ["https://example.com/thumbnails/article31.jpg", "https://example.com/thumbnails/article32.jpg"],
+      "source": "danchi"
+    }
+  ]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Mẫu 2
+{
+  "title": "Bản Tin Tổng Hợp Ngày 6/8/2025",
+  "summary": "Video này tổng hợp những tin tức nổi bật trong ngày, từ tình hình kinh tế toàn cầu đến cảnh báo thiên tai và các tiến bộ công nghệ mới nhất.",
+  "articles": [
+    "https://money.vtv.vn/hoi-doanh-nhan-tre-viet-nam-se-to-chuc-dien-dan-kinh-te-tu-nhan-nam-2025",
+    "https://money.vtv.vn/chuyen-gia-con-du-dia-de-viet-nam-dat-muc-tieu-tang-truong-85",
+    "https://money.vtv.vn/shb-duoc-nhnn-chap-thuan-tang-von-dieu-le-len-45942-ti-dong"
+  ]
+}

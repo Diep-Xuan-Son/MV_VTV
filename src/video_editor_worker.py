@@ -1,10 +1,12 @@
 import os
 import cv2
+import random
 import asyncio
 import subprocess
 import unicodedata
 import re as regex
 from PIL import ImageFont
+from datetime import datetime
 from itertools import accumulate
 
 import sys
@@ -14,6 +16,13 @@ DIR = FILE.parents[0]
 ROOT = FILE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
+
+from libs.config import Config
+from libs.utils import logging, formatter
+LOGGER = logging.getLogger("video_editor_worker")
+FILE_HANDLER = logging.FileHandler(f"{Config.PATH_LOG}{os.sep}video_editor_worker_{datetime.now().strftime('%Y_%m_%d')}.log")
+FILE_HANDLER.setFormatter(formatter)
+LOGGER.addHandler(FILE_HANDLER)
 
 def split_tittle(title: str, size_title: list, font_type: str, font_text_sz: int):
     w_title, h_title = size_title
@@ -153,7 +162,7 @@ class VideoEditorWorker(object):
         return float(stdout.decode().strip())
 
     async def overlay_image(self, bg_image_path: str, list_overlay_image: list, list_duration: list, output_path: str, fast: bool):
-        print(f"----running overlay_image----")
+        LOGGER.info(f"----running overlay_image----")
         inputs = []
         infor_input = ""
         infor_overlay = ""
@@ -193,17 +202,112 @@ class VideoEditorWorker(object):
         else:
             cmd = ['ffmpeg', '-y', '-loop', '0', '-i', bg_image_path] + inputs + ['-filter_complex', f'{infor_input}{infor_overlay}{infor_merge} concat=n={len(list_overlay_image)}:v=1:a=0', '-t', str(sum(list_duration)), '-c:v', 'libx264', "-preset", "fast", "-r", "30", output_path]
 
-        print(f"----cmd: {cmd}")
+        LOGGER.info(f"----cmd: {cmd}")
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         stdout, stderr = await proc.communicate()
         # subprocess.run(cmd, check=True)
         return {"success": True, "bg_size": size_bg[:2][::-1]}
 
-    # async def add_static_text(self, texts: list, img_size: list):
+    async def overlay_image_effect(self, bg_image_path: str, list_overlay_image: list, list_duration: list, output_path: str, fast: bool):
+        list_duration = [d[::-1] for d in list_duration[::-1]]
+        LOGGER.info(f"----running overlay_image----")
+        inputs = []
+        infor_input = ""
+        infor_overlay = ""
+        infor_merge = ""
+        last_ov_output = "0:v"
+        size_bg = cv2.imread(bg_image_path).shape
+        # print(size_bg)
+        # exit()
+        last_fade_output = "ov1"
+        infor_fades = ""
+        count = 1
+        for j, l_ovi in enumerate(list_overlay_image[::-1]):
+            for i, ovi in enumerate(l_ovi[::-1]):
+                ov_id = f"ov{count}"
+                size_ovi = cv2.imread(ovi).shape
+                # print(size_ovi)
+                inputs += ["-loop", "1", "-t", f"{list_duration[j][i]}", "-i", ovi]
+                if size_bg[0] > size_bg[1]:
+                    if size_ovi[0] < size_bg[0]:
+                        # fix_size = f"scale=(1-0.1*sin(5*PI*t/{list_duration[i]*3}))*iw:(1-0.1*sin(5*PI*t/{list_duration[i]*3}))*ih:eval=frame,pad=iw*{size_bg[0]}/ih:{size_bg[0]}:(ow-iw)/2:(oh-ih)/2"
+                        fix_size = f"scale=iw*{size_bg[0]//2.4}/ih:{size_bg[0]//2.4}:eval=frame,setsar=1,tile=3x3,pad=iw*{max(size_bg[0],3*size_bg[0]//2.4)}/ih:{max(size_bg[0],3*size_bg[0]//2.4)}:(ow-iw)/2:(oh-ih)/2"
+                    else:
+                        # fix_size = f"scale=(1-0.1*sin(2*PI*t/{list_duration[i]*3}))*iw*{size_bg[0]}/ih:(1-0.1*sin(2*PI*t/{list_duration[i]*3}))*{size_bg[0]}:eval=frame"
+                        size_ovi = [size_bg[0], size_ovi[1]*size_bg[0]/size_ovi[0]]
+                        fix_size = f"scale=iw*{size_bg[0]}/ih:{size_bg[0]}:eval=frame,setsar=1,tile=3x3,pad=iw*{max(size_bg[0],size_ovi[0]*3)}/ih:{max(size_bg[0],size_ovi[0]*3)}:(ow-iw)/2:(oh-ih)/2"
+                    infor_input += f"[{count}:v]{fix_size},crop={size_bg[1]}:{size_bg[0]}:(in_w-out_w)/2:(in_h-out_h)/2,format=rgba[{ov_id}];"
+                else:
+                    if size_ovi[1] < size_bg[1]:
+                        # fix_size = f"scale=(1-0.1*sin(2*PI*t/{list_duration[i]*3}))*iw:(1-0.1*sin(2*PI*t/{list_duration[i]*3}))*ih:eval=frame,pad={size_bg[1]}:ih*{size_bg[1]}/iw:(ow-iw)/2:(oh-ih)/2"
+                        fix_size = f"scale={size_bg[1]}:ih*{size_bg[1]}/iw:eval=frame,setsar=1,tile=3x3,pad=iw*{max(size_bg[0],size_ovi[0]*3)}/ih:{max(size_bg[0],size_ovi[0]*3)}:(ow-iw)/2:(oh-ih)/2"
+                    else:
+                        # fix_size = f"scale=(1-0.1*sin(2*PI*t/{list_duration[i]*3}))*{size_bg[1]}:(1-0.1*sin(2*PI*t/{list_duration[i]*3}))*ih*{size_bg[1]}/iw:eval=frame"
+                        fix_size = f"scale={size_bg[1]}:ih*{size_bg[1]}/iw:eval=frame,setsar=1,tile=3x3,pad=iw*{max(size_bg[0],size_ovi[0]*3)}/ih:{max(size_bg[0],size_ovi[0]*3)}:(ow-iw)/2:(oh-ih)/2"
+                    infor_input += f"[{count}:v]{fix_size},crop={size_bg[1]}:{size_bg[0]}:(in_w-out_w)/2:(in_h-out_h)/2,format=rgba[{ov_id}];"
 
+                next_fade_output = f"v{count-1}{count}"
+                count += 1
+
+                if j==0 and i==0:
+                    continue
+                
+                if i==0:
+                    infor_fades += f'[{ov_id}][{last_fade_output}]xfade=transition=hblur:duration={1}:offset={round(list_duration[j][i]-1)}[{next_fade_output}];'
+                else:
+                    infor_fades += f'[{ov_id}][{last_fade_output}]xfade=transition=fade:duration={0.1}:offset={round(list_duration[j][i]-0.1)}[{next_fade_output}];'
+                last_fade_output = next_fade_output
+        infor_overlay += f"[{last_fade_output}][{last_ov_output}]overlay=x='(W-w)/2':y='(H-h)/2'"
+
+        if fast:
+            cmd = ['ffmpeg', '-y', '-loop', '0', '-i', bg_image_path] + inputs + ['-filter_complex', f'{infor_input}{infor_fades}{infor_overlay}', '-t', str(sum(sum(list_duration, []))), '-c:v', "h264_nvenc", "-preset", "fast", "-c:a", "copy", "-r", "30", output_path]
+        else:
+            cmd = ['ffmpeg', '-y', '-loop', '0', '-i', bg_image_path] + inputs + ['-filter_complex', f'{infor_input}{infor_overlay}{infor_merge} concat=n={len(list_overlay_image)}:v=1:a=0', '-t', str(sum(list_duration)), '-c:v', 'libx264', "-preset", "fast", "-r", "30", output_path]
+
+        LOGGER.info(f"----cmd: {cmd}")
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout, stderr = await proc.communicate()
+        # subprocess.run(cmd, check=True)
+        return {"success": True, "bg_size": size_bg[:2][::-1]}
+
+    async def add_effect(self, effect_type: list, list_video_path: list, video_output_path: str, fast: bool):
+        print(f"----running add_effect----")
+        inputs = []
+        info_convert = ""
+        video_fades = ""
+        last_fade_output = "vid0"
+        # video_length = 0
+        for i, inp in enumerate(list_video_path[::-1]):
+            i_choice = random.choice(range(len(effect_type)))
+            duration = await self.get_duration(inp)
+            # duration = 8
+            inputs += ["-i", inp]
+            info_convert += f'[{i}:v]fps=30,scale={1080}:{1920}:force_original_aspect_ratio=decrease,pad={1080}:{1920}:(ow-iw)/2:(oh-ih)/2[vid{i}];'
+            if i==0:
+                # video_length += duration
+                continue
+            next_fade_output = f"v{i-1}{i}"
+            if i == len(list_video_path)-1:
+                video_fades += f'[vid{i}][{last_fade_output}]xfade=transition={effect_type[i_choice]}:duration={1}:offset={round(duration-2)}'
+            else:
+                video_fades += f'[vid{i}][{last_fade_output}]xfade=transition={effect_type[i_choice]}:duration={1}:offset={round(duration-2)}[{next_fade_output}];'
+                last_fade_output = next_fade_output
+                # video_length += duration
+        # print(info_convert)
+        # print(video_fades)
+        # exit()
+        # cmd = ['ffmpeg', '-y'] + inputs + ['-filter_complex', f'[0:v]fps=30,format=yuv420p[vid1]; [1:v]fps=30,format=yuv420p[vid2];[vid1][vid2]xfade=transition={effect_type}:duration=2:offset=60,format=yuv420p', video_output_path]
+        if fast:
+            cmd = ['ffmpeg', '-y'] + inputs + ['-filter_complex', f'{info_convert}{video_fades}', "-c:v", "h264_nvenc", "-preset", "fast", "-c:a", "copy", "-crf", "20", video_output_path]
+        else:
+            cmd = ['ffmpeg', '-y'] + inputs + ['-filter_complex', f'{info_convert}{video_fades}', "-c:v", "libx264", "-crf", "20", video_output_path]
+        print(f"----cmd: {cmd}")
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout, stderr = await proc.communicate()
+        return {"success": True}
 
     async def add_text(self, title: str, texts: list, img_size: list, video_input_path: str, video_output_path: str, fast: bool, start_time: list=[0], text_position: list=[65, 65, 40, 160, 615, 720]):
-        print(f"----running add_text----")
+        LOGGER.info(f"----running add_text----")
         padding_left, padding_right, y_title_top, y_title_bottom, y_sub_top, y_sub_bottom = text_position
         # print(texts)
         # print(start_time)
@@ -346,7 +450,7 @@ class VideoEditorWorker(object):
         return {"success": True}
 
     async def add_audio(self, video_input_path: str, list_audio_path: list, list_audio_time: list, audio_background_path: str, video_output_path: str):   #audio time in miliseconds
-        print(f"----running add_audio----")
+        LOGGER.info(f"----running add_audio----")
         if len(list_audio_path)!=len(list_audio_time):
             return {"success": False, "error": "The number of time start and the number of audio path is not the same"}
         a_inputs = ["-i", video_input_path]
@@ -369,7 +473,7 @@ class VideoEditorWorker(object):
         a_ids += f"[a{len(list_audio_path)+1}]"
 
         cmd = ['ffmpeg', '-y'] + a_inputs + ['-filter_complex', f'{a_info}{a_ids}amix=inputs={len(list_audio_path)+1}:normalize=1:dropout_transition=2[a]', '-map', '0:v', '-map', '[a]', "-c:v", "copy", "-c:a", "aac", "-shortest", video_output_path]
-        print(f"----cmd: {cmd}")
+        LOGGER.info(f"----cmd: {cmd}")
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         stdout, stderr = await proc.communicate()
         return {"success": True}
@@ -379,11 +483,14 @@ if __name__=="__main__":
     bg_image_path = "./data_test/bg3.png"
     # list_overlay_image = ["./data_test/tra-sen2.png","./data_test/tra-sen3.png","./data_test/uong-tra.png", "./data_test/image_2025_03_05T02_30_16_004Z.png"]
     # list_duration = [3,4,5,6]
-    list_overlay_image = ["./src/static/images/test/anh-man-hinh-2025-06-30-luc-151006-1751271744324832396409-39807437566204113909774.webp", "./src/static/images/test/anh-man-hinh-2025-06-30-luc-152100-17512717443371789887541-24162800044629725962397.webp", "./src/static/images/test/bong-bong--1--09291149322045938356465.png"]
+    list_overlay_image = ["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"]
     list_duration = [5,5,5]
-    output_path = "data_test/output.mp4"
+    output_path = "data_test/output2.mp4"
     # asyncio.run(VEW.overlay_image(bg_image_path, list_overlay_image, list_duration, output_path, False))
-    # exit()
+    list_overlay_image = [["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"],["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"],["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"]]
+    list_duration = [[5,5,5],[5,5,5],[5,5,5]]
+    asyncio.run(VEW.overlay_image_effect(bg_image_path, list_overlay_image, list_duration, output_path, True))
+    exit()
 
     title = "Cuối ngày 30/6: Giá vàng, thế giới và trong nước, đồng loạt bật tăng mạnh"
     # text = f"**Trà Việt Nam:** đã có mặt trên thị trường quốc: tế từ thế kỷ 17%, nhờ vào các công ty Đông Ấn Hà Lan và Anh. \nGần đây, **ông Thân Dỹ Ngữ**, Giám đốc Công ty TNHH Hiệp Thành, đã thành công trong việc đưa trà Việt Nam vào kệ của **Mariage Frères**, một thương hiệu trà cao cấp nổi tiếng, giúp quảng bá trà Việt Nam ra thế giới." 
@@ -397,8 +504,10 @@ if __name__=="__main__":
     start_time = [0, 15]
     text_position = [160, 160, 160, 420, 1490, 1715]
     # text_position = [65, 65, 40, 160, 615, 720]
-    asyncio.run(VEW.add_text(title, [text], img_size, video_input_path, video_output_path, fast, start_time, text_position))
+    # asyncio.run(VEW.add_text(title, [text], img_size, video_input_path, video_output_path, fast, start_time, text_position))
 
 
     # duration = asyncio.run(VEW.get_duration("./data_test/0.wav"))
     # print(duration)
+
+    asyncio.run(VEW.add_effect(["hblur"], ['./data_test/output.mp4', './data_test/output1.mp4'], "./data_test/abc.mp4", True))

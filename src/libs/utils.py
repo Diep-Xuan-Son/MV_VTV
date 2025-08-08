@@ -10,11 +10,18 @@ import time
 import json
 import shutil 
 import logging 
-import datetime
 import traceback
 from loguru import logger
 from fastapi.responses import StreamingResponse, JSONResponse
 from functools import wraps
+
+import logging
+formatter = logging.Formatter("%(asctime)s | %(name)s | %(levelname)s | %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format=formatter._fmt,
+    stream=sys.stderr,
+)
 
 def check_folder_exist(*args, **kwargs):
 	if len(args) != 0:

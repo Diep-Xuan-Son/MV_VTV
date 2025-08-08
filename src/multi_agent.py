@@ -1,8 +1,16 @@
 import os
 import jwt
 import asyncio
+from datetime import datetime
 from langchain_openai import ChatOpenAI
 from base.agent import Agent
+
+from libs.config import Config
+from libs.utils import logging, formatter
+LOGGER = logging.getLogger("multi_agent")
+FILE_HANDLER = logging.FileHandler(f"{Config.PATH_LOG}{os.sep}multi_agent_{datetime.now().strftime('%Y_%m_%d')}.log")
+FILE_HANDLER.setFormatter(formatter)
+LOGGER.addHandler(FILE_HANDLER)
 
 PROMPT_IDEA = """
 Here is the title: {title}
@@ -127,16 +135,16 @@ class MultiAgent(object):
             """Format the response as JSON with keys are 'idea_<index>'"""
 
         result = await self.idea_agent(OutputStructured, text=text, title=title)
-        print(f"----get_idea: {result}")
+        LOGGER.info(f"----get_idea: {result}")
         return result
 
     async def select_idea(self, description: dict, ideas: dict):
         def OutputStructured(BaseModel):
             """Format the response as JSON with keys are id videos, and values are pairs of idea index with content of idea"""
 
-        print(description)
+        LOGGER.info(description)
         result = await self.classify_agent(OutputStructured, description=description, ideas=ideas)
-        print(f"----select_idea: {result}")
+        LOGGER.info(f"----select_idea: {result}")
         return result
 
     async def synthesize_idea(self, ideas, title):
@@ -144,7 +152,7 @@ class MultiAgent(object):
             """Format the response as JSON with keys are id videos, and values are short news"""
 
         result = await self.synthesis_agent(OutputStructured, ideas=ideas, title=title)
-        print(f"----synthesize_idea: {result}")
+        LOGGER.info(f"----synthesize_idea: {result}")
         return result
 
     async def rewrite_abbreviation(self, news):
@@ -152,7 +160,7 @@ class MultiAgent(object):
             """Format the response as JSON with keys are id videos, and values are pairs of abbreviation and new words"""
 
         result = await self.rewrite_abbreviation_agent(OutputStructured, news=news)
-        print(f"----rewrite_abbreviation: {result}")
+        LOGGER.info(f"----rewrite_abbreviation: {result}")
         return result
 
     async def split_title(self, title):
@@ -160,7 +168,7 @@ class MultiAgent(object):
             """Format the response as JSON with key is 'result'"""
 
         result = await self.split_title_agent(OutputStructured, title=title)
-        print(f"----split_title: {result}")
+        LOGGER.info(f"----split_title: {result}")
         return result
 
 if __name__=="__main__":

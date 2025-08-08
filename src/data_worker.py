@@ -11,15 +11,20 @@ import time
 import uuid
 import json 
 import redis
-import datetime
 import traceback
 import numpy as np
 from tqdm import tqdm
 from minio import Minio
+from datetime import datetime
 from urllib.parse import urlparse 
 from confluent_kafka.admin import NewTopic
 
-from libs.utils import MyException
+from libs.config import Config
+from libs.utils import MyException, logging, formatter
+LOGGER = logging.getLogger("data_worker")
+FILE_HANDLER = logging.FileHandler(f"{Config.PATH_LOG}{os.sep}data_worker_{datetime.now().strftime('%Y_%m_%d')}.log")
+FILE_HANDLER.setFormatter(formatter)
+LOGGER.addHandler(FILE_HANDLER)
 
 class DBWorker(object):
     def __init__(self, 
@@ -128,15 +133,15 @@ class DBWorker(object):
                 try:
                     f.result()  # Block until topic creation completes
                     message = f"Topic '{topic}' created successfully."
-                    print(message)
+                    LOGGER.info(message)
                     return {"success": True, "message": message}
                 except Exception as e:
                     tb_str = traceback.format_exc()
-                    print(f"Failed to create topic '{topic}': {tb_str}")
+                    LOGGER.error(f"Failed to create topic '{topic}': {tb_str}")
                     return {"success": False, "error": e}
         else:
             error_ms = f"Topic '{topic_name}' already exists."
-            print(error_ms)
+            LOGGER.error(error_ms)
             return {"success": False, "error": error_ms}
         
     def delete_topic(self, client: object, topic_name: str):
@@ -149,24 +154,24 @@ class DBWorker(object):
                 try:
                     f.result()  # Wait for deletion to complete
                     message = f"Topic '{topic}' deleted."
-                    print(message)
+                    LOGGER.info(message)
                     return {"success": True, "message": message}
                 except Exception as e:
                     tb_str = traceback.format_exc()
-                    print(f"Failed to delete topic '{topic}': {tb_str}")
+                    LOGGER.error(f"Failed to delete topic '{topic}': {tb_str}")
                     return {"success": False, "error": e}
         else:
             error_ms = f"Topic '{topic_name}' doesn't exists."
-            print(error_ms)
+            LOGGER.error(error_ms)
             return {"success": False, "error": error_ms}
     
     def produce_message(self, producer: object, topic: str, messages: list[dict]):
         # Delivery report callback to confirm message delivery
         def delivery_report(err, msg):
             if err is not None:
-                print(f"❌ Delivery failed: {err}")
+                LOGGER.error(f"❌ Delivery failed: {err}")
             else:
-                print(f"✅ Message delivered to {msg.topic()} [{msg.partition()}]")
+                LOGGER.info(f"✅ Message delivered to {msg.topic()} [{msg.partition()}]")
         
         for message in messages:
             message_json = json.dumps(message)
@@ -182,7 +187,7 @@ class DBWorker(object):
         #----create db minio----
         res = self.create_bucket(bucket_name=bucket_name)
         if not res["success"]:
-            print(res["error"])
+            LOGGER.error(res["error"])
         #///////////////////////
         return {"success": True}
     
@@ -191,7 +196,7 @@ class DBWorker(object):
         # ----delete db qdrant----
         res = self.delete_collection(collection_name=collection_name)
         if not res["success"]:
-            print(res["error"])
+            LOGGER.error(res["error"])
         #/////////////////////////
         
         self.cur.execute(f'''DROP TABLE IF EXISTS {table_name}''')
@@ -232,10 +237,10 @@ class DBWorker(object):
         for i, (vid, file_name) in enumerate(tqdm(img_path.items())):
             #----upload file to minio----
             if file_name:
-                print("----upload to minio----")
+                LOGGER.info("----upload to minio----")
                 res = self.upload_file2bucket(bucket_name=bucket_name, folder_name=sess_id, list_file_path=[file_name])
                 if not res["success"]:
-                    print(res["error"])
+                    LOGGER.error(res["error"])
                     img_path_new[vid] = ""
                     return res
                 else:
@@ -243,7 +248,7 @@ class DBWorker(object):
             #////////////////////////////
             else:
                 img_path_new[vid] = ""
-        self.update_status(sess_id, "data", str(datetime.datetime.now()), {}, 95, "pending")
+        self.update_status(sess_id, "data", str(datetime.now()), {}, 95, "pending")
         # print(list_path_new)
         
         return {"success": True, "img_path_new": img_path_new}
