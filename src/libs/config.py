@@ -59,7 +59,7 @@ class Config:
     FOLDER_FINAL_VIDEO = os.getenv('FOLDER_FINAL_VIDEO', "final_video_mvvtv")
 
     SECRET_KEY     = os.getenv('SECRET_KEY', "MMV")
-    token_openai   = os.getenv('API_KEY_OPENAI', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5Ijoic2stcHJvai1QSDNHNnlMVEticmdvaU9ieTA4YlVMNHc0eVYxR3NJa25IeEltTl9VMFI1WmVsOWpKcDI0MzZuNUEwOTdVdTVDeXVFMDJha1RqNVQzQmxia0ZKX3dJTUw2RHVrZzh4eWtsUXdsMTN0b2JfcGVkV1c0T1hsNzhQWGVIcDhOLW1DNjY1ZE1CdUlLMFVlWEt1bzRRUnk2Ylk1dDNYSUEifQ.2qjUENU0rafI6syRlTfnKIsm6O4zuhHRqahUcculn8E')
+    token_openai   = os.getenv('API_KEY_OPENAI', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5Ijoic2stcHJvai1OTDJUa0cyWVRZOFJwcTNPLURmSjg5WHY2MG5qbDZCcklhYWs5TC12SFZOaHVaa3Zsc2FRc3pVQmUzbV9xbmRsSlowOVZJU1UzRlQzQmxia0ZKVzctVEtCSkFiSlZXTFJtMGREWGg0a2thSlhoWm9TYkEtbXdWQkMzcWdkSjY4YXJDSUZycVlfYU9BZXN3NXFSc0IzX2ZGUlNLWUEifQ.JSvIHYuDugxQlE0qRKcVxYB3UbiKddEcqPFYlZoRnSs')
     API_KEY_OPENAI = jwt.decode(token_openai, SECRET_KEY, algorithms=["HS256"])["api_key"]
     
     token_gem   = os.getenv('API_KEY_GEM', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5IjoiQUl6YVN5Q1BKSHNJYUxXaGdMakllQkZVS3E4VHFrclRFdWhGd2xzIn0.7iN_1kRmOahYrT7i5FUplOYeda1s7QhYzk-D-AlgWgE')

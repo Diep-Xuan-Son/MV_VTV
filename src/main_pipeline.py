@@ -297,6 +297,10 @@ class VideoGeneration(object):
 
         return {"success": True, "result_path": final_video_audio_file, "list_path_delete": list_path_delete}
 
+    # @MyException()
+    # async def gen_serial_video(self, sess_id: str, title_main: str, published_at: str, category: str, articles: list):
+        
+
 if __name__=="__main__":
     SECRET_KEY     = os.getenv('SECRET_KEY', "MMV")
     token_openai   = os.getenv('API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcGlfa2V5Ijoic2stcHJvai1QSDNHNnlMVEticmdvaU9ieTA4YlVMNHc0eVYxR3NJa25IeEltTl9VMFI1WmVsOWpKcDI0MzZuNUEwOTdVdTVDeXVFMDJha1RqNVQzQmxia0ZKX3dJTUw2RHVrZzh4eWtsUXdsMTN0b2JfcGVkV1c0T1hsNzhQWGVIcDhOLW1DNjY1ZE1CdUlLMFVlWEt1bzRRUnk2Ylk1dDNYSUEifQ.2qjUENU0rafI6syRlTfnKIsm6O4zuhHRqahUcculn8E')

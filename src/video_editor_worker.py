@@ -485,10 +485,14 @@ if __name__=="__main__":
     # list_duration = [3,4,5,6]
     list_overlay_image = ["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"]
     list_duration = [5,5,5]
-    output_path = "data_test/output2.mp4"
+    output_path = "data_test/output3.mp4"
     # asyncio.run(VEW.overlay_image(bg_image_path, list_overlay_image, list_duration, output_path, False))
     list_overlay_image = [["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"],["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"],["./src/static/images/test/1.webp", "./src/static/images/test/2.webp", "./src/static/images/test/3.png"]]
     list_duration = [[5,5,5],[5,5,5],[5,5,5]]
+    black_img = "./src/data/image_backgrounds/black_image.jpg"
+    duration_black_img = 5
+    list_overlay_image[0].insert(0, black_img)
+    list_duration[0].insert(0, duration_black_img)
     asyncio.run(VEW.overlay_image_effect(bg_image_path, list_overlay_image, list_duration, output_path, True))
     exit()
 
